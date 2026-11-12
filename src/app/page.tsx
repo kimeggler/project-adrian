@@ -1,14 +1,16 @@
+import CharacterSelect from "@/components/landing/CharacterSelect";
 import Controls from "@/components/landing/Controls";
+import HeroSprite from "@/components/landing/HeroSprite";
 import PixelSprite from "@/components/landing/PixelSprite";
 import Records from "@/components/landing/Records";
 import SettingsPanel from "@/components/landing/SettingsPanel";
 import StartButton from "@/components/landing/StartButton";
-import { COIN_FRAMES, KNIGHT_FRAMES } from "@/game/art/sprites";
+import { COIN_FRAMES } from "@/game/art/sprites";
 
 /**
  * Retro landing page (LP-1). Built from independent sections so more can be
- * added (LP-2): records and settings are sections; character select and
- * daily challenge (P2) can follow as new sections here or as their own routes.
+ * added (LP-2): character select, records and settings are sections; the
+ * daily challenge (P2) can follow as a new section here or as its own route.
  */
 export default function Home() {
   return (
@@ -23,10 +25,11 @@ export default function Home() {
           </h1>
           <PixelSprite frames={COIN_FRAMES} scale={4} fps={8} label="Spinning coin" />
         </div>
-        <PixelSprite frames={KNIGHT_FRAMES.run} scale={6} fps={10} label="The little knight, running" />
+        <HeroSprite />
         <p className="max-w-sm text-[10px] leading-relaxed text-white [text-shadow:2px_2px_0_#222034]">
           A tiny knight. A big, random world. Every run is new.
         </p>
+        <CharacterSelect />
         <StartButton />
         <Records />
       </section>

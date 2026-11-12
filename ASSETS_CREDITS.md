@@ -11,6 +11,7 @@ No third-party or copyrighted game assets (Minecraft, Nintendo, etc.) may be use
 | Coins, spikes, flag, checkpoints, hearts, dust | Hand-drawn pixel data in `src/game/art/sprites.ts` | Original work, part of this project |
 | Touch button icons (left, right, jump, sword, pause) | Hand-drawn pixel data in `src/game/art/sprites.ts` | Original work, part of this project |
 | Enemies: slime (walk, squashed), hopper (crouch, air), stone totem (idle, charge) and its rock | Hand-drawn pixel data in `src/game/art/sprites.ts` | Original work, part of this project |
+| Heroes: ranger (hood, feather) and paladin (golden helmet, crest), built on the knight frames | Hand-drawn pixel data in `src/game/art/sprites.ts` | Original work, part of this project |
 | Power-ups: speed boots, shield, throwing axe (spin frames are rotations of the axe) | Hand-drawn pixel data in `src/game/art/sprites.ts` | Original work, part of this project |
 | Shield bubble | Drawn with code in `src/game/textures.ts` | Original work, part of this project |
 | Tiles (grass, dirt, stone block, castle wall) | Drawn with code in `src/game/art/tiles.ts` | Original work, part of this project |

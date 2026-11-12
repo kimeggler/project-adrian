@@ -13,6 +13,7 @@ import {
   ICON_RIGHT,
   ICON_SWORD,
   SLASH,
+  heroFrames,
   KNIGHT_FRAMES,
   KNIGHT_SIZE,
   PALETTE,
@@ -27,6 +28,7 @@ import {
   SPIKES,
   type Sprite,
 } from "./sprites";
+import { CHARACTERS } from "../characters";
 import { CHECKPOINT, COIN, ENEMY, FLAG as FLAG_SIZE, PROJECTILE, TILE } from "../config";
 
 const sprites: Record<string, { sprite: Sprite; w: number; h: number }> = {
@@ -48,10 +50,12 @@ const sprites: Record<string, { sprite: Sprite; w: number; h: number }> = {
   itemShield: { sprite: ITEM_SHIELD, w: 8, h: 8 },
   itemAxe: { sprite: ITEM_AXE, w: 8, h: 8 },
 };
-for (const [anim, frames] of Object.entries(KNIGHT_FRAMES)) {
-  frames.forEach((sprite, i) => {
-    sprites[`knight.${anim}.${i}`] = { sprite, w: KNIGHT_SIZE, h: KNIGHT_SIZE };
-  });
+for (const c of CHARACTERS) {
+  for (const [anim, frames] of Object.entries(heroFrames(c.look))) {
+    frames.forEach((sprite, i) => {
+      sprites[`${c.id}.${anim}.${i}`] = { sprite, w: KNIGHT_SIZE, h: KNIGHT_SIZE };
+    });
+  }
 }
 for (const [name, set] of Object.entries({ hopper: HOPPER_FRAMES, totem: TOTEM_FRAMES })) {
   for (const [anim, frames] of Object.entries(set)) {
@@ -88,6 +92,15 @@ describe("pixel art", () => {
   it("rotates the thrown axe through four different quarter turns", () => {
     expect(new Set(AXE_SPIN_FRAMES.map((f) => f.join("|"))).size).toBe(4);
     expect(AXE_SPIN_FRAMES[0]).toEqual(ITEM_AXE);
+  });
+
+  it("every hero has its own look but the same eye spot (CB-9)", () => {
+    const idles = CHARACTERS.map((c) => heroFrames(c.look).idle[0].join("\n"));
+    expect(new Set(idles).size).toBe(CHARACTERS.length);
+    for (const c of CHARACTERS) {
+      // Hurt frame: wide white eye, shifted left by the recoil lean.
+      expect(heroFrames(c.look).hurt[0][5][10]).toBe("W");
+    }
   });
 
   it("knight frames differ between animation steps", () => {

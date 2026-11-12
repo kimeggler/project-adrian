@@ -39,7 +39,7 @@ export const PALETTE: Readonly<Record<string, string>> = {
 // Knight (16×16 frames, facing right)
 // ---------------------------------------------------------------------------
 
-const PLUME = {
+const PLUME: Readonly<Record<"rest" | "sway" | "up", readonly string[]>> = {
   rest: ["....PPp.........", "...PPPPp........"],
   sway: ["...PPp..........", "..PPPPp........."],
   up: [".....PPp........", "...PPPPp........"],
@@ -83,7 +83,7 @@ const LEGS = {
 } as const;
 
 interface KnightPose {
-  plume: readonly string[];
+  plume: keyof typeof PLUME;
   legs: readonly string[];
   /** Move the upper body up by this many pixels (running bounce). */
   bob?: number;
@@ -94,8 +94,22 @@ interface KnightPose {
   body?: readonly string[];
 }
 
-function knight({ plume, legs, bob = 0, lean = 0, eye = "O", body = BODY }: KnightPose): Sprite {
-  let upper = [...plume, ...HELMET, ...body];
+/**
+ * What makes a hero look different (CB-9): its own head and plume rows (same
+ * sizes as the knight's, eye at the same spot) and a color swap for the rest.
+ */
+export interface HeroLook {
+  head: readonly string[];
+  plume: Readonly<Record<keyof typeof PLUME, readonly string[]>>;
+  /** Palette character → replacement, applied to body and legs. */
+  recolor?: Readonly<Record<string, string>>;
+}
+
+const recolorRows = (rows: readonly string[], map: Readonly<Record<string, string>> = {}) =>
+  rows.map((row) => [...row].map((c) => map[c] ?? c).join(""));
+
+function hero(look: HeroLook, { plume, legs, bob = 0, lean = 0, eye = "O", body = BODY }: KnightPose): Sprite {
+  let upper = [...look.plume[plume], ...look.head, ...recolorRows(body, look.recolor)];
   const eyeRow = upper[EYE.row];
   upper[EYE.row] = eyeRow.slice(0, EYE.col) + eye + eyeRow.slice(EYE.col + 1);
   if (lean > 0) upper = upper.map((r) => r.slice(lean) + ".".repeat(lean));
@@ -103,26 +117,64 @@ function knight({ plume, legs, bob = 0, lean = 0, eye = "O", body = BODY }: Knig
     // Shift up and repeat the last body row so there is no gap above the legs.
     upper = [...upper.slice(bob), ...Array(bob).fill(upper[upper.length - 1])];
   }
-  return [...upper, ...legs];
+  return [...upper, ...recolorRows(legs, look.recolor)];
 }
 
+/** Animation frames of one hero, in spritesheet order. */
+export function heroFrames(look: HeroLook) {
+  const f = (pose: KnightPose) => hero(look, pose);
+  return {
+    idle: [f({ plume: "rest", legs: LEGS.idle }), f({ plume: "sway", legs: LEGS.idle })],
+    run: [
+      f({ plume: "sway", legs: LEGS.strideA }),
+      f({ plume: "sway", legs: LEGS.pass, bob: 1 }),
+      f({ plume: "sway", legs: LEGS.strideB }),
+      f({ plume: "sway", legs: LEGS.pass, bob: 1 }),
+    ],
+    jump: [f({ plume: "sway", legs: LEGS.tuck })],
+    fall: [f({ plume: "up", legs: LEGS.dangle })],
+    hurt: [f({ plume: "up", legs: LEGS.idle, lean: 1, eye: "W" })],
+    attack: [f({ plume: "sway", legs: LEGS.strideA, body: BODY_ATTACK })],
+  } as const;
+}
+
+export type HeroFrames = ReturnType<typeof heroFrames>;
+
+/** The little knight: steel helmet, red plume, blue tunic. */
+export const KNIGHT_LOOK: HeroLook = { head: HELMET, plume: PLUME };
+
+/** Ranger: green hood with a yellow feather, brown leather tunic. */
+export const RANGER_LOOK: HeroLook = {
+  head: [
+    "....OOOOOOO.....",
+    "...OlGGGGGGO....",
+    "..OlGGGGGGGGO...",
+    "..OGGGGOFFFFO...",
+    "..OgGGGOFFFFO...",
+    "..OggGGGOOOOO...",
+    "...OgggggggO....",
+  ],
+  plume: {
+    rest: ["................", "...YYy.........."],
+    sway: ["................", "..YYy..........."],
+    up: ["................", "....YYy........."],
+  },
+  recolor: { B: "L", b: "K", L: "K" },
+};
+
+/** Paladin: golden helmet with a white crest, white tunic. */
+export const PALADIN_LOOK: HeroLook = {
+  head: recolorRows(HELMET, { H: "Y", h: "W", s: "y" }),
+  plume: {
+    rest: ["....WWWh........", "...WWWWWh......."],
+    sway: ["...WWWh.........", "..WWWWWh........"],
+    up: [".....WWWh.......", "...WWWWWh......."],
+  },
+  recolor: { B: "W", b: "h" },
+};
+
 /** Knight animation frames, in spritesheet order. */
-export const KNIGHT_FRAMES = {
-  idle: [
-    knight({ plume: PLUME.rest, legs: LEGS.idle }),
-    knight({ plume: PLUME.sway, legs: LEGS.idle }),
-  ],
-  run: [
-    knight({ plume: PLUME.sway, legs: LEGS.strideA }),
-    knight({ plume: PLUME.sway, legs: LEGS.pass, bob: 1 }),
-    knight({ plume: PLUME.sway, legs: LEGS.strideB }),
-    knight({ plume: PLUME.sway, legs: LEGS.pass, bob: 1 }),
-  ],
-  jump: [knight({ plume: PLUME.sway, legs: LEGS.tuck })],
-  fall: [knight({ plume: PLUME.up, legs: LEGS.dangle })],
-  hurt: [knight({ plume: PLUME.up, legs: LEGS.idle, lean: 1, eye: "W" })],
-  attack: [knight({ plume: PLUME.sway, legs: LEGS.strideA, body: BODY_ATTACK })],
-} as const;
+export const KNIGHT_FRAMES = heroFrames(KNIGHT_LOOK);
 
 /**
  * Sword slash in front of the knight (16×9, facing right): the blade plus a

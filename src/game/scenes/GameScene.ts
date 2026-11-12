@@ -34,7 +34,8 @@ import { buildTestLevel } from "../levels/testLevel";
 import { Health, type DamageOutcome } from "../systems/Health";
 import { playSfx, SfxKey } from "../systems/Audio";
 import { PlayerInput } from "../systems/Input";
-import { getSettings, recordProgress } from "../systems/Save";
+import { getCharacter, type Character } from "../characters";
+import { getSave, getSettings, recordProgress } from "../systems/Save";
 import { coinPoints, timeBonus } from "../systems/Score";
 import { AnimKey, TextureKey } from "../textures";
 import { SOLID_TILES } from "../tiles";
@@ -74,6 +75,8 @@ export class GameScene extends Phaser.Scene {
   private axes!: Phaser.Physics.Arcade.Group;
   /** Message for the HUD to show once (e.g. a sword upgrade). */
   private toast?: string;
+  /** Hero picked on the landing page (CB-9). */
+  private character: Character = getCharacter("knight");
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
   private swordDebug?: Phaser.GameObjects.Graphics;
   /** Lives when this level began; "Restart level" goes back to this. */
@@ -98,7 +101,8 @@ export class GameScene extends Phaser.Scene {
     this.toast = undefined;
     this.swordDebug = undefined; // destroyed with the previous level's objects
     this.livesAtStart = data.lives ?? HEALTH.START_LIVES;
-    this.health = new Health(this.livesAtStart);
+    this.character = getCharacter(getSave().character);
+    this.health = new Health(this.livesAtStart, this.character.stats.heartsPerLife);
     this.elapsedMs = 0;
     this.phase = "playing";
   }
@@ -107,7 +111,7 @@ export class GameScene extends Phaser.Scene {
     this.level = this.testLevel
       ? buildTestLevel()
       : generateLevel(this.seed, this.levelNumber).level;
-    if (!this.testLevel) recordProgress({ level: this.levelNumber });
+    const unlocked = this.testLevel ? [] : recordProgress({ level: this.levelNumber });
     this.game.events.emit(GameEvent.LEVEL_STARTED, {
       seed: this.seed,
       level: this.levelNumber,
@@ -149,8 +153,13 @@ export class GameScene extends Phaser.Scene {
 
     // --- Player --------------------------------------------------------------
     const input = new PlayerInput(this);
-    this.player = new Player(this, spawn.x, spawn.y, input);
+    this.player = new Player(this, spawn.x, spawn.y, input, this.character);
     this.equipSword();
+    if (unlocked.length > 0) {
+      for (const id of unlocked) this.addToast(`NEW HERO: ${getCharacter(id).name.toUpperCase()}!`);
+      // A sword upgrade on this level already played the fanfare.
+      if (swordForLevel(this.levelNumber).fromLevel !== this.levelNumber) playSfx(this, SfxKey.SWORD_UPGRADE);
+    }
     this.createJuice();
     this.physics.add.collider(this.player, layer);
     this.physics.add.overlap(this.player, flagSprite, () => this.completeLevel());
@@ -433,7 +442,7 @@ export class GameScene extends Phaser.Scene {
     const sword = swordForLevel(this.levelNumber);
     this.player.setSword(sword);
     if (this.levelNumber > 1 && sword.fromLevel === this.levelNumber) {
-      this.toast = `SWORD UP!\n${sword.label}`;
+      this.addToast(`SWORD UP!\n${sword.label}`);
       playSfx(this, SfxKey.SWORD_UPGRADE);
     }
     if (!this.testLevel) recordProgress({ weaponLevel: sword.swordLevel });
@@ -478,6 +487,11 @@ export class GameScene extends Phaser.Scene {
         break;
       }
     }
+  }
+
+  /** Queue a HUD announcement; messages in the same frame are shown together. */
+  private addToast(message: string): void {
+    this.toast = this.toast ? `${this.toast}\n${message}` : message;
   }
 
   /** The HUD takes this message once and shows it. */

@@ -13,7 +13,8 @@ import {
 } from "../config";
 import { PowerUps } from "../systems/PowerUps";
 import { swordHitbox, type Rect } from "../systems/Combat";
-import { AnimKey, TextureKey } from "../textures";
+import { getCharacter, type Character } from "../characters";
+import { heroAnimKey, heroTextureKey, TextureKey } from "../textures";
 import type { PlayerInput } from "../systems/Input";
 
 export type PlayerState = "idle" | "run" | "jump" | "fall" | "hurt" | "attack";
@@ -47,14 +48,6 @@ export interface PlayerDebugInfo {
   state: PlayerState;
 }
 
-const STATE_ANIMS: Record<PlayerState, string> = {
-  idle: AnimKey.KNIGHT_IDLE,
-  run: AnimKey.KNIGHT_RUN,
-  jump: AnimKey.KNIGHT_JUMP,
-  fall: AnimKey.KNIGHT_FALL,
-  hurt: AnimKey.KNIGHT_HURT,
-  attack: AnimKey.KNIGHT_ATTACK,
-};
 
 /** Move `value` toward `target` by at most `maxDelta`. */
 function approach(value: number, target: number, maxDelta: number): number {
@@ -118,8 +111,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     x: number,
     y: number,
     private readonly controls: PlayerInput,
+    /** Which hero this is (CB-9): sprite set and small stat differences. */
+    readonly character: Character = getCharacter("knight"),
   ) {
-    super(scene, x, y, TextureKey.PLAYER, 0);
+    super(scene, x, y, heroTextureKey(character.id), 0);
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
@@ -134,8 +129,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.setVisible(false);
 
     // Drawn above enemies and pickups.
-    this.view = scene.add.sprite(x, y, TextureKey.PLAYER, 0).setOrigin(0.5, 1).setDepth(10);
-    this.view.play(STATE_ANIMS.idle);
+    this.view = scene.add.sprite(x, y, heroTextureKey(character.id), 0).setOrigin(0.5, 1).setDepth(10);
+    this.view.play(heroAnimKey(character.id, "idle"));
     this.slash = scene.add.image(x, y, TextureKey.SLASH).setOrigin(0, 0).setDepth(11).setVisible(false);
     this.bubble = scene.add.image(x, y, TextureKey.SHIELD_BUBBLE).setDepth(12).setVisible(false);
     // POST_UPDATE runs after Arcade has moved the body for this frame.
@@ -260,7 +255,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         }
       } else if (this.attackCooldownMs <= 0) {
         this.attackMs = SWORD.ACTIVE_MS;
-        this.attackCooldownMs = this.sword.cooldownMs;
+        this.attackCooldownMs = this.sword.cooldownMs * this.character.stats.swordCooldown;
         this.swingId++;
         this.emit(PlayerEvent.ATTACK);
       }
@@ -275,7 +270,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // --- Horizontal movement ------------------------------------------------
     const dir = this.controls.direction;
     const control = grounded ? 1 : PHYSICS.AIR_CONTROL;
-    const runSpeed = PHYSICS.RUN_SPEED * (this.powerUps.has("boots") ? POWERUP.BOOTS_SPEED : 1);
+    const runSpeed =
+      PHYSICS.RUN_SPEED *
+      this.character.stats.runSpeed *
+      (this.powerUps.has("boots") ? POWERUP.BOOTS_SPEED : 1);
     const target = dir * runSpeed;
     const braking = dir !== 0 && Math.sign(body.velocity.x) === -dir;
     let rate: number;
@@ -417,7 +415,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
     if (next !== this._state) {
       this._state = next;
-      this.view.play(STATE_ANIMS[next], true);
+      this.view.play(heroAnimKey(this.character.id, next), true);
     }
   }
 

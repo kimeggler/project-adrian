@@ -7,6 +7,7 @@
  * - Every storage access is wrapped in try/catch. Without storage (private
  *   mode, blocked cookies, SSR) the game keeps working from memory.
  */
+import { CHARACTERS, DEFAULT_CHARACTER, isCharacterId, unlockedByLevel, type CharacterId } from "../characters";
 import { AUDIO, JUICE } from "../config";
 
 export const SAVE_KEY = "little-knight:save";
@@ -27,8 +28,10 @@ export interface SaveData {
   bestScore: number;
   /** Highest level number the player has reached. */
   highestLevel: number;
-  /** For character select (P2). */
-  unlockedCharacters: string[];
+  /** Heroes the player may pick (LP-5). Always includes the knight. */
+  unlockedCharacters: CharacterId[];
+  /** Hero picked on the landing page; always one of unlockedCharacters. */
+  character: CharacterId;
   /** For sword upgrades (P2). */
   weaponLevel: number;
 }
@@ -47,7 +50,8 @@ export function defaultSave(): SaveData {
     },
     bestScore: 0,
     highestLevel: 0,
-    unlockedCharacters: ["knight"],
+    unlockedCharacters: [DEFAULT_CHARACTER],
+    character: DEFAULT_CHARACTER,
     weaponLevel: 1,
   };
 }
@@ -65,6 +69,12 @@ export function sanitizeSave(raw: unknown): SaveData {
   const r = raw as Record<string, unknown>;
   // Future versions migrate here: if (r.version === 1) { ...convert to 2... }
   const s = (r.settings ?? {}) as Record<string, unknown>;
+  const highestLevel = int(r.highestLevel, d.highestLevel);
+  // Stored unlocks plus whatever the highest level earns (older saves had no
+  // unlock rules yet), in the order of CHARACTERS.
+  const stored = Array.isArray(r.unlockedCharacters) ? r.unlockedCharacters.filter(isCharacterId) : [];
+  const unlocked = new Set<CharacterId>([DEFAULT_CHARACTER, ...stored, ...unlockedByLevel(highestLevel)]);
+  const unlockedCharacters = CHARACTERS.map((c) => c.id).filter((id) => unlocked.has(id));
   return {
     version: SAVE_VERSION,
     settings: {
@@ -74,13 +84,10 @@ export function sanitizeSave(raw: unknown): SaveData {
       screenShake: bool(s.screenShake, d.settings.screenShake),
     },
     bestScore: int(r.bestScore, d.bestScore),
-    highestLevel: int(r.highestLevel, d.highestLevel),
-    unlockedCharacters:
-      Array.isArray(r.unlockedCharacters) &&
-      r.unlockedCharacters.every((c) => typeof c === "string") &&
-      r.unlockedCharacters.length > 0
-        ? (r.unlockedCharacters as string[])
-        : d.unlockedCharacters,
+    highestLevel,
+    unlockedCharacters,
+    character:
+      isCharacterId(r.character) && unlocked.has(r.character) ? r.character : d.character,
     weaponLevel: int(r.weaponLevel, d.weaponLevel) || d.weaponLevel,
   };
 }
@@ -141,7 +148,10 @@ export function updateSettings(patch: Partial<Settings>): Settings {
   return updateSave((d) => ({ ...d, settings: { ...d.settings, ...patch } })).settings;
 }
 
-/** Record progress: keeps the best score, highest level and best sword reached. */
+/**
+ * Record progress: keeps the best score, highest level and best sword
+ * reached. Returns the heroes this progress unlocked (usually none).
+ */
 export function recordProgress({
   score,
   level,
@@ -150,13 +160,21 @@ export function recordProgress({
   score?: number;
   level?: number;
   weaponLevel?: number;
-}): void {
+}): CharacterId[] {
   const d = getSave();
   const bestScore = Math.max(d.bestScore, score ?? 0);
   const highestLevel = Math.max(d.highestLevel, level ?? 0);
   const bestWeapon = Math.max(d.weaponLevel, weaponLevel ?? 0);
-  if (bestScore === d.bestScore && highestLevel === d.highestLevel && bestWeapon === d.weaponLevel) return;
-  updateSave((s) => ({ ...s, bestScore, highestLevel, weaponLevel: bestWeapon }));
+  if (bestScore === d.bestScore && highestLevel === d.highestLevel && bestWeapon === d.weaponLevel) return [];
+  const before = d.unlockedCharacters;
+  const after = updateSave((s) => ({ ...s, bestScore, highestLevel, weaponLevel: bestWeapon }));
+  return after.unlockedCharacters.filter((id) => !before.includes(id));
+}
+
+/** Pick the hero for the next run. Locked heroes are ignored. */
+export function selectCharacter(id: CharacterId): void {
+  if (!getSave().unlockedCharacters.includes(id)) return;
+  updateSave((s) => ({ ...s, character: id }));
 }
 
 /** Subscribe to save changes (e.g. the landing page). Returns an unsubscribe function. */

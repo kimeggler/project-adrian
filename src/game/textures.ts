@@ -14,7 +14,7 @@ import {
   ICON_PAUSE,
   ICON_RIGHT,
   ICON_SWORD,
-  KNIGHT_FRAMES,
+  heroFrames,
   KNIGHT_SIZE,
   SLASH,
   AXE_SPIN_FRAMES,
@@ -29,12 +29,12 @@ import {
   type Sprite,
 } from "./art/sprites";
 import { drawBlock, drawGround, drawGroundTop, drawWall } from "./art/tiles";
+import { CHARACTERS, type CharacterId } from "./characters";
 import { COIN, ENEMY, GAME_HEIGHT, POWERUP, TILE, TOUCH } from "./config";
 import { TileId, TILESET_SIZE } from "./tiles";
 
 export const TextureKey = {
   TILES: "tiles",
-  PLAYER: "knight",
   SLIME: "slime",
   HOPPER: "hopper",
   TOTEM: "totem",
@@ -65,12 +65,6 @@ export const TextureKey = {
 } as const;
 
 export const AnimKey = {
-  KNIGHT_IDLE: "knight-idle",
-  KNIGHT_RUN: "knight-run",
-  KNIGHT_JUMP: "knight-jump",
-  KNIGHT_FALL: "knight-fall",
-  KNIGHT_HURT: "knight-hurt",
-  KNIGHT_ATTACK: "knight-attack",
   COIN_SPIN: "coin-spin",
   SLIME_WALK: "slime-walk",
   AXE_SPIN: "axe-spin",
@@ -78,6 +72,13 @@ export const AnimKey = {
 
 /** Frame index of the squashed slime in the slime sheet. */
 export const SLIME_SQUASHED_FRAME = SLIME_FRAMES.walk.length;
+/** Spritesheet of one hero (CB-9). */
+export const heroTextureKey = (id: CharacterId) => `hero-${id}`;
+
+export type HeroAnimState = "idle" | "run" | "jump" | "fall" | "hurt" | "attack";
+/** Animation of one hero in one state, e.g. "hero-ranger-run". */
+export const heroAnimKey = (id: CharacterId, state: HeroAnimState) => `hero-${id}-${state}`;
+
 /** Frame indices in the hopper and totem sheets. */
 export const HOPPER_FRAME = { CROUCH: 0, AIR: 1 } as const;
 export const TOTEM_FRAME = { IDLE: 0, CHARGE: 1 } as const;
@@ -88,7 +89,7 @@ const ANIM_FPS = { idle: 3, run: 12, coin: 8 } as const;
 /** Draws every texture from the pixel-art data and registers animations. */
 export function createTextures(scene: Phaser.Scene): void {
   createTileset(scene);
-  createSheet(scene, TextureKey.PLAYER, Object.values(KNIGHT_FRAMES).flat(), KNIGHT_SIZE);
+  for (const c of CHARACTERS) createHero(scene, c.id, heroFrames(c.look));
   createSheet(scene, TextureKey.COIN, COIN_FRAMES, COIN.SIZE);
   createSheet(scene, TextureKey.SLIME, [...SLIME_FRAMES.walk, ...SLIME_FRAMES.squashed], ENEMY.SIZE);
   createSheet(scene, TextureKey.HOPPER, [...HOPPER_FRAMES.crouch, ...HOPPER_FRAMES.air], ENEMY.SIZE);
@@ -201,21 +202,27 @@ function createLayer(
   tex.refresh();
 }
 
-function createAnimations(scene: Phaser.Scene): void {
-  // Frame indices follow the order of KNIGHT_FRAMES.
+/** One hero's spritesheet and its animations (frame order = HeroFrames order). */
+function createHero(scene: Phaser.Scene, id: CharacterId, frames: ReturnType<typeof heroFrames>): void {
+  const key = heroTextureKey(id);
+  createSheet(scene, key, Object.values(frames).flat(), KNIGHT_SIZE);
   let index = 0;
   const range = (n: number) => {
-    const frames = Array.from({ length: n }, (_, i) => ({ key: TextureKey.PLAYER, frame: index + i }));
+    const list = Array.from({ length: n }, (_, i) => ({ key, frame: index + i }));
     index += n;
-    return frames;
+    return list;
   };
-  const k = KNIGHT_FRAMES;
-  scene.anims.create({ key: AnimKey.KNIGHT_IDLE, frames: range(k.idle.length), frameRate: ANIM_FPS.idle, repeat: -1 });
-  scene.anims.create({ key: AnimKey.KNIGHT_RUN, frames: range(k.run.length), frameRate: ANIM_FPS.run, repeat: -1 });
-  scene.anims.create({ key: AnimKey.KNIGHT_JUMP, frames: range(k.jump.length) });
-  scene.anims.create({ key: AnimKey.KNIGHT_FALL, frames: range(k.fall.length) });
-  scene.anims.create({ key: AnimKey.KNIGHT_HURT, frames: range(k.hurt.length) });
-  scene.anims.create({ key: AnimKey.KNIGHT_ATTACK, frames: range(k.attack.length) });
+  const anim = (state: HeroAnimState, extra: Partial<Phaser.Types.Animations.Animation> = {}) =>
+    scene.anims.create({ key: heroAnimKey(id, state), frames: range(frames[state].length), ...extra });
+  anim("idle", { frameRate: ANIM_FPS.idle, repeat: -1 });
+  anim("run", { frameRate: ANIM_FPS.run, repeat: -1 });
+  anim("jump");
+  anim("fall");
+  anim("hurt");
+  anim("attack");
+}
+
+function createAnimations(scene: Phaser.Scene): void {
   scene.anims.create({
     key: AnimKey.SLIME_WALK,
     frames: SLIME_FRAMES.walk.map((_, i) => ({ key: TextureKey.SLIME, frame: i })),
