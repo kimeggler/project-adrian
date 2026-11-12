@@ -4,7 +4,6 @@ import { SceneKey } from "./keys";
 /*
  * Overlay scenes registered from phase 0 so the scene structure is in place.
  * Their content is built in later phases:
- *   - LevelCompleteScene: phase 2
  *   - PauseScene, GameOverScene: phase 3
  */
 
@@ -17,11 +16,5 @@ export class PauseScene extends Phaser.Scene {
 export class GameOverScene extends Phaser.Scene {
   constructor() {
     super(SceneKey.GAME_OVER);
-  }
-}
-
-export class LevelCompleteScene extends Phaser.Scene {
-  constructor() {
-    super(SceneKey.LEVEL_COMPLETE);
   }
 }

@@ -1,10 +1,11 @@
 import type * as Phaser from "phaser";
-import { PLACEHOLDER_COLORS, PLAYER, TILE } from "./config";
+import { FLAG, PLACEHOLDER_COLORS, PLAYER, TILE } from "./config";
 import { TileId, TILESET_SIZE } from "./tiles";
 
 export const TextureKey = {
   TILES: "tiles",
   PLAYER: "player",
+  FLAG: "flag",
 } as const;
 
 /**
@@ -14,6 +15,25 @@ export const TextureKey = {
 export function createPlaceholderTextures(scene: Phaser.Scene): void {
   createTileset(scene);
   createPlayerTexture(scene);
+  createFlagTexture(scene);
+}
+
+function createFlagTexture(scene: Phaser.Scene): void {
+  const tex = scene.textures.createCanvas(TextureKey.FLAG, FLAG.WIDTH, FLAG.HEIGHT);
+  if (!tex) return;
+  const ctx = tex.getContext();
+  const poleX = (FLAG.WIDTH - 2) / 2;
+  // Pole with a knob on top.
+  ctx.fillStyle = PLACEHOLDER_COLORS.FLAG_POLE;
+  ctx.fillRect(poleX, 2, 2, FLAG.HEIGHT - 2);
+  ctx.fillRect(poleX - 1, 0, 4, 3);
+  // Pennant pointing right.
+  ctx.fillStyle = PLACEHOLDER_COLORS.FLAG_CLOTH;
+  for (let i = 0; i < 6; i++) {
+    ctx.fillRect(poleX + 2, 4 + i, 6 - i, 1);
+    ctx.fillRect(poleX + 2, 15 - i, 6 - i, 1);
+  }
+  tex.refresh();
 }
 
 function createTileset(scene: Phaser.Scene): void {

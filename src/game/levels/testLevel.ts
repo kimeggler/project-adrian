@@ -7,6 +7,8 @@ export interface Level {
   heightTiles: number;
   /** Spawn position in px (bottom-center of the player). */
   spawn: { x: number; y: number };
+  /** Level-end flag position in px (bottom-center of the pole). */
+  flag: { x: number; y: number };
 }
 
 /**
@@ -62,10 +64,13 @@ export function buildTestLevel(): Level {
     data[y][W - 1] = TileId.WALL;
   }
 
+  const flagCol = W - 1 - WORLD.FLAG_TILES_FROM_END;
+
   return {
     data,
     widthTiles: W,
     heightTiles: H,
     spawn: { x: 3 * TILE, y: (H - ground[3]) * TILE },
+    flag: { x: flagCol * TILE + TILE / 2, y: (H - ground[flagCol]) * TILE },
   };
 }

@@ -94,6 +94,36 @@ export const WORLD = {
   LEVEL_HEIGHT_TILES: 9,
   /** Falling this far below the level counts as falling into a pit (px). */
   PIT_MARGIN: 32,
+  /** Flat, safe area at the start (spawn) and end (flag) of a level, in tiles. */
+  SAFE_ZONE_TILES: 8,
+  /** Flag position, counted in tiles from the right end wall. */
+  FLAG_TILES_FROM_END: 4,
+} as const;
+
+export const FLAG = {
+  /** Placeholder sprite size (px): pole plus pennant. */
+  WIDTH: 16,
+  HEIGHT: 48,
+  /** Overlap hitbox around the pole (px). */
+  HITBOX_WIDTH: 6,
+} as const;
+
+// ---------------------------------------------------------------------------
+// UI (in-game screens)
+// ---------------------------------------------------------------------------
+
+export const UI = {
+  TEXT: {
+    fontFamily: "monospace",
+    fontSize: "8px",
+    color: "#ffffff",
+  },
+  ACCENT: "#fbf236",
+  BUTTON_BG: "#3f3f74",
+  /** Opacity of the dark overlay behind menus. */
+  OVERLAY_ALPHA: 0.6,
+  /** Ignore keys for this long after a menu opens (ms). */
+  INPUT_DELAY_MS: 300,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -105,6 +135,8 @@ export const PLACEHOLDER_COLORS = {
   GROUND: "#8f563b",
   BLOCK: "#9badb7",
   WALL: "#3f3f74",
+  FLAG_POLE: "#cbdbfc",
+  FLAG_CLOTH: "#d95763",
   PLAYER: {
     idle: "#d9a066",
     run: "#df7126",

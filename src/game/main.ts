@@ -2,11 +2,8 @@ import * as Phaser from "phaser";
 import { BACKGROUND_COLOR, GAME_HEIGHT, GAME_WIDTH, PHYSICS } from "./config";
 import { BootScene } from "./scenes/BootScene";
 import { GameScene } from "./scenes/GameScene";
-import {
-  GameOverScene,
-  LevelCompleteScene,
-  PauseScene,
-} from "./scenes/StubScenes";
+import { LevelCompleteScene } from "./scenes/LevelCompleteScene";
+import { GameOverScene, PauseScene } from "./scenes/StubScenes";
 import { UIScene } from "./scenes/UIScene";
 
 /**
