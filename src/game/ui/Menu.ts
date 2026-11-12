@@ -1,13 +1,16 @@
 import * as Phaser from "phaser";
 import { UI } from "../config";
+import { playSfx, SfxKey } from "../systems/Audio";
 import { onKeyPress } from "../utils/keys";
+import { textStyle } from "./font";
 
 export interface MenuItem {
   label: string;
   action: () => void;
 }
 
-const ROW_HEIGHT = 16;
+/** Button boxes are ~20 px tall with the pixel font; keep a small gap. */
+const ROW_HEIGHT = 22;
 
 /**
  * Vertical button list for in-game screens.
@@ -27,11 +30,12 @@ export class Menu {
   ) {
     items.forEach((item, i) => {
       const button = scene.add
-        .text(x, y + i * ROW_HEIGHT, item.label, {
-          ...UI.TEXT,
-          backgroundColor: UI.BUTTON_BG,
-          padding: { x: 6, y: 3 },
-        })
+        .text(
+          x,
+          y + i * ROW_HEIGHT,
+          item.label,
+          textStyle({ backgroundColor: UI.BUTTON_BG, padding: { x: 6, y: 3 } }),
+        )
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true });
       button.on(Phaser.Input.Events.POINTER_OVER, () => this.select(i));
@@ -55,13 +59,17 @@ export class Menu {
 
   private select(index: number): void {
     const n = this.items.length;
-    this.selected = ((index % n) + n) % n;
+    const next = ((index % n) + n) % n;
+    if (next === this.selected) return;
+    this.selected = next;
+    playSfx(this.scene, SfxKey.MENU_SELECT);
     this.render();
   }
 
   private choose(index: number): void {
     if (this.chosen) return;
     this.chosen = true;
+    playSfx(this.scene, SfxKey.MENU_SELECT);
     this.items[index].action();
   }
 
@@ -79,7 +87,7 @@ export function addOverlay(scene: Phaser.Scene, title: string, color: string = U
   const { width, height } = scene.scale;
   scene.add.rectangle(0, 0, width, height, 0x000000, UI.OVERLAY_ALPHA).setOrigin(0);
   scene.add
-    .text(width / 2, 22, title, { ...UI.TEXT, fontSize: "16px", color })
+    .text(width / 2, 22, title, textStyle({ fontSize: "16px", color }))
     .setOrigin(0.5);
   return width / 2;
 }

@@ -22,6 +22,18 @@ function startDataFromUrl(): LevelStartData {
   };
 }
 
+/**
+ * The site's pixel font (next/font gives it a generated family name, so read
+ * it from the page). Waits until it is loaded so canvas text can use it;
+ * falls back to the browser's monospace after a short timeout.
+ */
+async function loadPixelFont(): Promise<string> {
+  const family = getComputedStyle(document.body).fontFamily;
+  const timeout = new Promise((resolve) => setTimeout(resolve, 1500));
+  await Promise.race([document.fonts.load(`8px ${family}`).catch(() => {}), timeout]);
+  return family;
+}
+
 /** Keep the URL in sync with the level being played, so it can be shared. */
 function writeLevelToUrl({ seed, level, testLevel }: LevelStartedEvent): void {
   const query = `?seed=${seed}&level=${level}${testLevel ? "&testlevel" : ""}`;
@@ -46,8 +58,14 @@ export default function GameCanvas() {
     let cancelled = false;
 
     // Import Phaser only in the browser; it touches `window` on load.
-    import("@/game/main").then(({ createGame, fitIntegerZoom }) => {
+    const modules = Promise.all([
+      import("@/game/main"),
+      import("@/game/ui/font"),
+      loadPixelFont(),
+    ]);
+    modules.then(([{ createGame, fitIntegerZoom }, { setUiFont }, fontFamily]) => {
       if (cancelled) return;
+      setUiFont(fontFamily);
       game = createGame(container, startDataFromUrl());
       const g = game;
       g.events.once(GameEvent.QUIT_TO_MENU, () => router.push("/"));

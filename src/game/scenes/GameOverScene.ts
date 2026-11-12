@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { UI } from "../config";
+import { textStyle } from "../ui/font";
 import { addOverlay, Menu } from "../ui/Menu";
 import type { GameScene } from "./GameScene";
 import { SceneKey } from "./keys";
@@ -16,13 +16,13 @@ export class GameOverScene extends Phaser.Scene {
 
     const { level, seed, score } = game.hud;
     this.add
-      .text(cx, 40, `You reached level ${level}`, UI.TEXT)
+      .text(cx, 44, `You reached level ${level}`, textStyle())
       .setOrigin(0.5);
     this.add
-      .text(cx, 52, `Score ${score} · Seed ${seed}`, UI.TEXT)
+      .text(cx, 58, `Score ${score} · Seed ${seed}`, textStyle())
       .setOrigin(0.5);
 
-    new Menu(this, cx, 76, [
+    new Menu(this, cx, 84, [
       { label: "Retry level", action: () => game.retryLevel() },
       { label: "Back to menu", action: () => game.quitToMenu() },
     ]);

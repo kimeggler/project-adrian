@@ -1,15 +1,28 @@
 import * as Phaser from "phaser";
-import { CAMERA, CHECKPOINT, COIN, FLAG, HEALTH, SPIKES, TILE, WORLD } from "../config";
-import { Player } from "../entities/Player";
+import {
+  CAMERA,
+  CHECKPOINT,
+  COIN,
+  FLAG,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  HEALTH,
+  JUICE,
+  SPIKES,
+  TILE,
+  WORLD,
+} from "../config";
+import { Player, PlayerEvent } from "../entities/Player";
 import { GameEvent } from "../events";
 import { generateLevel } from "../levelgen/generator";
 import { nextSeed } from "../levelgen/seed";
 import type { Level, Point } from "../levels/level";
 import { buildTestLevel } from "../levels/testLevel";
 import { Health, type DamageOutcome } from "../systems/Health";
+import { playSfx, SfxKey } from "../systems/Audio";
 import { PlayerInput } from "../systems/Input";
 import { coinPoints, timeBonus } from "../systems/Score";
-import { TextureKey } from "../textures";
+import { AnimKey, TextureKey } from "../textures";
 import { SOLID_TILES } from "../tiles";
 import type { HudState, LevelResult, LevelStartData } from "../types";
 import { onKeyPress, pauseToggleEvents } from "../utils/keys";
@@ -63,6 +76,8 @@ export class GameScene extends Phaser.Scene {
     const { data, widthTiles, heightTiles, spawn, flag } = this.level;
     this.respawnPoint = spawn;
 
+    this.createParallax(widthTiles * TILE);
+
     // --- Tilemap -------------------------------------------------------------
     const map = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
     const tileset = map.addTilesetImage(TextureKey.TILES, TextureKey.TILES);
@@ -86,7 +101,8 @@ export class GameScene extends Phaser.Scene {
 
     const coins = this.physics.add.staticGroup();
     for (const p of this.level.coins) {
-      const coin = this.physics.add.staticImage(p.x, p.y, TextureKey.COIN);
+      const coin = this.physics.add.staticSprite(p.x, p.y, TextureKey.COIN, 0);
+      coin.play({ key: AnimKey.COIN_SPIN, startFrame: Math.floor(p.x / TILE) % 4 });
       coin.body.setSize(COIN.HITBOX, COIN.HITBOX);
       coins.add(coin);
     }
@@ -94,6 +110,7 @@ export class GameScene extends Phaser.Scene {
     // --- Player --------------------------------------------------------------
     const input = new PlayerInput(this);
     this.player = new Player(this, spawn.x, spawn.y, input);
+    this.createJuice();
     this.physics.add.collider(this.player, layer);
     this.physics.add.overlap(this.player, flagSprite, () => this.completeLevel());
     this.physics.add.overlap(this.player, spikes, (_p, spike) =>
@@ -227,28 +244,81 @@ export class GameScene extends Phaser.Scene {
     this.scene.launch(SceneKey.PAUSE);
   }
 
+  /**
+   * Parallax background (WO-9): layers further away scroll slower. Each layer
+   * is a TileSprite with a scroll factor, wide enough to cover the level at
+   * its speed, so it moves with the camera without any per-frame update.
+   */
+  private createParallax(levelWidthPx: number): void {
+    const layers: [key: string, factor: number][] = [
+      [TextureKey.BG_SKY, 0],
+      [TextureKey.BG_CLOUDS, 0.1],
+      [TextureKey.BG_MOUNTAINS, 0.25],
+      [TextureKey.BG_HILLS, 0.5],
+    ];
+    for (const [key, factor] of layers) {
+      const width = Math.ceil(GAME_WIDTH + (levelWidthPx - GAME_WIDTH) * factor);
+      this.add.tileSprite(0, 0, width, GAME_HEIGHT, key).setOrigin(0).setScrollFactor(factor, 0);
+    }
+  }
+
+  /** Dust puffs (GF-1) and screen shake (GF-2), driven by player events. */
+  private createJuice(): void {
+    const dust = this.add.particles(0, 0, TextureKey.DUST, {
+      emitting: false,
+      lifespan: { min: 200, max: 350 },
+      speed: { min: 10, max: 35 },
+      angle: { min: 200, max: 340 }, // upwards, spreading sideways
+      gravityY: 40,
+      alpha: { start: 1, end: 0 },
+    });
+    const p = this.player;
+    p.on(PlayerEvent.JUMP, () => playSfx(this, SfxKey.JUMP));
+    p.on(PlayerEvent.LAND, (impact: number) => {
+      if (impact < JUICE.MIN_LAND_SPEED) return;
+      dust.explode(JUICE.DUST_LAND, p.x, p.y - 1);
+      playSfx(this, SfxKey.LAND);
+    });
+    p.on(PlayerEvent.TURN, (dir: number) => {
+      // Puff behind the feet, opposite the new direction.
+      dust.explode(JUICE.DUST_TURN, p.x - dir * 4, p.y - 1);
+    });
+    p.on(PlayerEvent.HURT, () => this.shake());
+  }
+
+  private shake(): void {
+    if (!JUICE.SCREEN_SHAKE) return;
+    this.cameras.main.shake(JUICE.SHAKE_MS, JUICE.SHAKE_INTENSITY);
+  }
+
   private onSpike(spike: Phaser.Physics.Arcade.Image): void {
     if (this.phase !== "playing") return;
     if (!this.player.hurt(spike.x)) return; // invincible
-    this.handleOutcome(this.health.damage(HEALTH.SPIKE_DAMAGE));
+    const outcome = this.health.damage(HEALTH.SPIKE_DAMAGE);
+    if (outcome === "hurt") playSfx(this, SfxKey.HURT);
+    this.handleOutcome(outcome);
   }
 
   private onCheckpoint(cp: Phaser.Physics.Arcade.Image): void {
     if (cp.getData("active")) return;
     cp.setData("active", true).setTexture(TextureKey.CHECKPOINT_ON);
     this.respawnPoint = { x: cp.x, y: cp.y };
+    playSfx(this, SfxKey.CHECKPOINT);
   }
 
   private onCoin(coin: Phaser.Physics.Arcade.Image): void {
     if (this.phase !== "playing") return;
     coin.disableBody(true, true);
     this.coins++;
+    playSfx(this, SfxKey.COIN);
   }
 
   private handleOutcome(outcome: DamageOutcome): void {
     if (outcome === "hurt") return;
 
     this.phase = "dying";
+    this.shake();
+    playSfx(this, SfxKey.DEATH);
     this.physics.pause();
     this.time.delayedCall(HEALTH.RESPAWN_DELAY_MS, () => {
       if (outcome === "gameOver") {
@@ -269,6 +339,7 @@ export class GameScene extends Phaser.Scene {
 
     this.physics.pause();
     this.player.body.setVelocity(0, 0);
+    playSfx(this, SfxKey.LEVEL_COMPLETE);
 
     const bonus = timeBonus(this.elapsedMs, this.level.widthTiles);
     const result: LevelResult = {

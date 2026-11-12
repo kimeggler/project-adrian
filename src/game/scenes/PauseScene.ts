@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import { UI } from "../config";
+import { textStyle } from "../ui/font";
 import { addOverlay, Menu } from "../ui/Menu";
 import { onKeyPress, pauseToggleEvents } from "../utils/keys";
 import type { GameScene } from "./GameScene";
@@ -19,10 +20,10 @@ export class PauseScene extends Phaser.Scene {
     const cx = addOverlay(this, "PAUSED");
 
     this.add
-      .text(cx, 40, `Level ${game.hud.level} · Seed ${game.hud.seed}`, UI.TEXT)
+      .text(cx, 44, `Level ${game.hud.level} · Seed ${game.hud.seed}`, textStyle())
       .setOrigin(0.5);
 
-    new Menu(this, cx, 66, [
+    new Menu(this, cx, 70, [
       { label: "Resume", action: () => game.resumeGame() },
       { label: "Restart level", action: () => game.restartLevel() },
       { label: "Quit to menu", action: () => game.quitToMenu() },

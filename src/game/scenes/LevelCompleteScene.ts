@@ -1,6 +1,6 @@
 import * as Phaser from "phaser";
-import { UI } from "../config";
 import type { LevelResult } from "../types";
+import { textStyle } from "../ui/font";
 import { addOverlay, Menu } from "../ui/Menu";
 import { formatTime } from "../utils/format";
 import type { GameScene } from "./GameScene";
@@ -20,7 +20,7 @@ export class LevelCompleteScene extends Phaser.Scene {
 
   create(): void {
     const { level, seed, timeMs, coins, coinsTotal, timeBonus, score } = this.result;
-    const cx = addOverlay(this, "LEVEL COMPLETE!");
+    const cx = addOverlay(this, "LEVEL CLEAR!");
 
     const rows: [string, string][] = [
       ["Level", String(level)],
@@ -31,13 +31,13 @@ export class LevelCompleteScene extends Phaser.Scene {
       ["Score", String(score)],
     ];
     rows.forEach(([label, value], i) => {
-      const y = 36 + i * 10;
-      this.add.text(cx - 60, y, label, UI.TEXT);
-      this.add.text(cx + 60, y, value, UI.TEXT).setOrigin(1, 0);
+      const y = 38 + i * 11;
+      this.add.text(cx - 60, y, label, textStyle());
+      this.add.text(cx + 60, y, value, textStyle()).setOrigin(1, 0);
     });
 
     const game = this.scene.get(SceneKey.GAME) as GameScene;
-    new Menu(this, cx, 106, [
+    new Menu(this, cx, 120, [
       { label: "Next level", action: () => game.nextLevel(score) },
     ]);
   }

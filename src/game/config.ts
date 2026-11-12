@@ -64,8 +64,8 @@ export const maxGapTiles = (): number =>
 // ---------------------------------------------------------------------------
 
 export const PLAYER = {
-  /** Placeholder sprite size (px). */
-  WIDTH: 12,
+  /** Sprite frame size (px). */
+  WIDTH: 16,
   HEIGHT: 16,
   /** Physics hitbox (px), bottom-centered in the sprite. */
   HITBOX_WIDTH: 10,
@@ -194,6 +194,43 @@ export const HEALTH = {
   RESPAWN_DELAY_MS: 700,
 } as const;
 
+// ---------------------------------------------------------------------------
+// Game feel / "juice" (GF-1 … GF-4)
+// ---------------------------------------------------------------------------
+
+export const JUICE = {
+  /** Dust puffs when landing / when braking to turn around (GF-1). */
+  DUST_LAND: 6,
+  DUST_TURN: 3,
+  /** Landing faster than this (px/s) makes dust and a squash. */
+  MIN_LAND_SPEED: 150,
+  /** Braking faster than this (px/s) to turn around makes dust. */
+  MIN_TURN_SPEED: 40,
+  /** Screen shake when hit (GF-2). Becomes a setting in phase 6. */
+  SCREEN_SHAKE: true,
+  SHAKE_MS: 150,
+  SHAKE_INTENSITY: 0.02,
+  /**
+   * Squash and stretch (GF-3), as sprite scale. Chosen so the 16×16 knight
+   * becomes whole-pixel sizes (14 or 18 px) and stays crisp.
+   */
+  STRETCH: { x: 14 / 16, y: 18 / 16 },
+  SQUASH: { x: 18 / 16, y: 14 / 16 },
+  SQUASH_MS: 120,
+  /** White flash when hit (GF-4). */
+  HIT_FLASH_MS: 80,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Audio (§2.4) — defaults; phase 6 makes them settings
+// ---------------------------------------------------------------------------
+
+export const AUDIO = {
+  SFX_VOLUME: 0.8,
+  MUSIC_VOLUME: 0.6,
+  MUTED: false,
+} as const;
+
 export const SPIKES = {
   /** Hitbox (px), bottom-centered in the 16×16 tile. Smaller than the art, to be fair. */
   HITBOX_WIDTH: 12,
@@ -232,30 +269,3 @@ export const UI = {
   INPUT_DELAY_MS: 300,
 } as const;
 
-// ---------------------------------------------------------------------------
-// Placeholder palette (until phase 5 art)
-// ---------------------------------------------------------------------------
-
-export const PLACEHOLDER_COLORS = {
-  GROUND_TOP: "#6abe30",
-  GROUND: "#8f563b",
-  BLOCK: "#9badb7",
-  WALL: "#3f3f74",
-  FLAG_POLE: "#cbdbfc",
-  FLAG_CLOTH: "#d95763",
-  CHECKPOINT_OFF: "#847e87",
-  CHECKPOINT_ON: "#37946e",
-  SPIKE: "#cbdbfc",
-  SPIKE_SHADE: "#847e87",
-  HEART: "#ac3232",
-  HEART_EMPTY: "#45283c",
-  COIN: "#fbf236",
-  COIN_SHADE: "#df7126",
-  PLAYER: {
-    idle: "#d9a066",
-    run: "#df7126",
-    jump: "#fbf236",
-    fall: "#99e550",
-    hurt: "#ac3232",
-  },
-} as const;

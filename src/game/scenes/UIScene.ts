@@ -1,22 +1,15 @@
 import * as Phaser from "phaser";
-import { GAME_WIDTH, UI } from "../config";
+import { GAME_WIDTH } from "../config";
 import { TextureKey } from "../textures";
+import { textStyle } from "../ui/font";
 import type { HudState } from "../types";
 import type { GameScene } from "./GameScene";
 import { SceneKey } from "./keys";
 
-const DEBUG_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
-  ...UI.TEXT,
-  backgroundColor: "#00000099",
-  padding: { x: 2, y: 1 },
-};
+const debugStyle = () => textStyle({ backgroundColor: "#00000099", padding: { x: 2, y: 1 } });
 
 /** Text with a dark outline so it stays readable on any background. */
-const HUD_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
-  ...UI.TEXT,
-  stroke: "#000000",
-  strokeThickness: 2,
-};
+const hudStyle = () => textStyle({ stroke: "#000000", strokeThickness: 2 });
 
 /**
  * HUD overlay on top of GameScene with its own fixed camera.
@@ -42,14 +35,14 @@ export class UIScene extends Phaser.Scene {
     this.hearts = [];
     this.last = undefined;
 
-    this.livesText = this.add.text(0, 2, "", HUD_STYLE);
+    this.livesText = this.add.text(0, 2, "", hudStyle());
     this.add.image(76, 3, TextureKey.COIN).setOrigin(0);
-    this.coinText = this.add.text(86, 2, "", HUD_STYLE);
-    this.scoreText = this.add.text(GAME_WIDTH / 2 + 30, 2, "", HUD_STYLE).setOrigin(0.5, 0);
-    this.levelText = this.add.text(GAME_WIDTH - 3, 2, "", HUD_STYLE).setOrigin(1, 0);
+    this.coinText = this.add.text(86, 2, "", hudStyle());
+    this.scoreText = this.add.text(GAME_WIDTH / 2 + 30, 2, "", hudStyle()).setOrigin(0.5, 0);
+    this.levelText = this.add.text(GAME_WIDTH - 3, 2, "", hudStyle()).setOrigin(1, 0);
 
     this.debugText = this.add
-      .text(2, 14, "", DEBUG_STYLE)
+      .text(2, 14, "", debugStyle())
       .setVisible(this.debugVisible)
       .setDepth(1000);
     if (this.debugVisible) this.setPhysicsDebug(true);

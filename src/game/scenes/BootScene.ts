@@ -1,17 +1,22 @@
 import * as Phaser from "phaser";
 import { START_DATA_KEY } from "../events";
-import { createPlaceholderTextures } from "../textures";
+import { loadSfx } from "../systems/Audio";
+import { createTextures } from "../textures";
 import type { LevelStartData } from "../types";
 import { SceneKey } from "./keys";
 
-/** Loads (or, until phase 5, generates) all assets, then starts the game. */
+/** Loads the sounds, builds textures and animations from the pixel-art data, then starts the game. */
 export class BootScene extends Phaser.Scene {
   constructor() {
     super(SceneKey.BOOT);
   }
 
+  preload(): void {
+    loadSfx(this);
+  }
+
   create(): void {
-    createPlaceholderTextures(this);
+    createTextures(this);
     const start = this.registry.get(START_DATA_KEY) as LevelStartData;
     this.scene.start(SceneKey.GAME, start);
   }

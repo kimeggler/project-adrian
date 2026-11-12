@@ -1,10 +1,26 @@
 import type * as Phaser from "phaser";
-import { CHECKPOINT, COIN, FLAG, PLACEHOLDER_COLORS, PLAYER, TILE } from "./config";
+import { drawClouds, drawHills, drawMountains, drawSky, LAYER_WIDTH } from "./art/backgrounds";
+import { paintSprite, spriteSize } from "./art/paint";
+import {
+  CHECKPOINT_OFF,
+  CHECKPOINT_ON,
+  COIN_FRAMES,
+  DUST,
+  FLAG,
+  HEART_EMPTY,
+  HEART_FULL,
+  KNIGHT_FRAMES,
+  KNIGHT_SIZE,
+  SPIKES,
+  type Sprite,
+} from "./art/sprites";
+import { drawBlock, drawGround, drawGroundTop, drawWall } from "./art/tiles";
+import { COIN, GAME_HEIGHT, TILE } from "./config";
 import { TileId, TILESET_SIZE } from "./tiles";
 
 export const TextureKey = {
   TILES: "tiles",
-  PLAYER: "player",
+  PLAYER: "knight",
   FLAG: "flag",
   CHECKPOINT_OFF: "checkpoint-off",
   CHECKPOINT_ON: "checkpoint-on",
@@ -12,163 +28,108 @@ export const TextureKey = {
   HEART_FULL: "heart-full",
   HEART_EMPTY: "heart-empty",
   COIN: "coin",
+  DUST: "dust",
+  BG_SKY: "bg-sky",
+  BG_CLOUDS: "bg-clouds",
+  BG_MOUNTAINS: "bg-mountains",
+  BG_HILLS: "bg-hills",
 } as const;
 
-/**
- * Placeholder textures (colored rectangles) drawn at runtime.
- * Replaced by real pixel art in phase 5.
- */
-export function createPlaceholderTextures(scene: Phaser.Scene): void {
+export const AnimKey = {
+  KNIGHT_IDLE: "knight-idle",
+  KNIGHT_RUN: "knight-run",
+  KNIGHT_JUMP: "knight-jump",
+  KNIGHT_FALL: "knight-fall",
+  KNIGHT_HURT: "knight-hurt",
+  COIN_SPIN: "coin-spin",
+} as const;
+
+/** Frame rates per animation (frames per second). */
+const ANIM_FPS = { idle: 3, run: 12, coin: 8 } as const;
+
+/** Draws every texture from the pixel-art data and registers animations. */
+export function createTextures(scene: Phaser.Scene): void {
   createTileset(scene);
-  createPlayerTexture(scene);
-  createFlagTexture(scene);
-  createCheckpointTexture(scene, TextureKey.CHECKPOINT_OFF, PLACEHOLDER_COLORS.CHECKPOINT_OFF);
-  createCheckpointTexture(scene, TextureKey.CHECKPOINT_ON, PLACEHOLDER_COLORS.CHECKPOINT_ON);
-  createSpikeTexture(scene);
-  createHeartTexture(scene, TextureKey.HEART_FULL, PLACEHOLDER_COLORS.HEART);
-  createHeartTexture(scene, TextureKey.HEART_EMPTY, PLACEHOLDER_COLORS.HEART_EMPTY);
-  createCoinTexture(scene);
-}
-
-function createCoinTexture(scene: Phaser.Scene): void {
-  const tex = scene.textures.createCanvas(TextureKey.COIN, COIN.SIZE, COIN.SIZE);
-  if (!tex) return;
-  const ctx = tex.getContext();
-  const disc = [" #### ", "######", "######", "######", "######", " #### "];
-  drawPattern(ctx, disc, PLACEHOLDER_COLORS.COIN_SHADE, 2, 1); // shadow edge
-  drawPattern(ctx, disc, PLACEHOLDER_COLORS.COIN, 1, 1);
-  ctx.fillStyle = PLACEHOLDER_COLORS.COIN_SHADE;
-  ctx.fillRect(4, 3, 1, 3); // stamp line
-  tex.refresh();
-}
-
-/** Draw a pixel pattern: one string per row, "#" = filled. */
-function drawPattern(
-  ctx: CanvasRenderingContext2D,
-  pattern: string[],
-  color: string,
-  ox = 0,
-  oy = 0,
-): void {
-  ctx.fillStyle = color;
-  pattern.forEach((row, y) => {
-    [...row].forEach((c, x) => {
-      if (c === "#") ctx.fillRect(ox + x, oy + y, 1, 1);
-    });
-  });
-}
-
-function createCheckpointTexture(scene: Phaser.Scene, key: string, cloth: string): void {
-  const tex = scene.textures.createCanvas(key, CHECKPOINT.WIDTH, CHECKPOINT.HEIGHT);
-  if (!tex) return;
-  const ctx = tex.getContext();
-  const poleX = 4;
-  ctx.fillStyle = PLACEHOLDER_COLORS.FLAG_POLE;
-  ctx.fillRect(poleX, 1, 2, CHECKPOINT.HEIGHT - 1);
-  ctx.fillStyle = cloth;
-  ctx.fillRect(poleX + 2, 2, 8, 6);
-  tex.refresh();
-}
-
-function createSpikeTexture(scene: Phaser.Scene): void {
-  const tex = scene.textures.createCanvas(TextureKey.SPIKES, TILE, TILE);
-  if (!tex) return;
-  const ctx = tex.getContext();
-  // Two spikes in the bottom half of the tile.
-  const spike = [
-    "   #   ",
-    "   #   ",
-    "  ###  ",
-    "  ###  ",
-    " ##### ",
-    " ##### ",
-    "#######",
-    "#######",
-  ];
-  drawPattern(ctx, spike, PLACEHOLDER_COLORS.SPIKE, 0, 8);
-  drawPattern(ctx, spike, PLACEHOLDER_COLORS.SPIKE, 8, 8);
-  ctx.fillStyle = PLACEHOLDER_COLORS.SPIKE_SHADE;
-  ctx.fillRect(0, 15, TILE, 1);
-  tex.refresh();
-}
-
-function createHeartTexture(scene: Phaser.Scene, key: string, color: string): void {
-  const tex = scene.textures.createCanvas(key, 7, 6);
-  if (!tex) return;
-  drawPattern(
-    tex.getContext(),
-    [" ## ## ", "#######", "#######", " ##### ", "  ###  ", "   #   "],
-    color,
-  );
-  tex.refresh();
-}
-
-function createFlagTexture(scene: Phaser.Scene): void {
-  const tex = scene.textures.createCanvas(TextureKey.FLAG, FLAG.WIDTH, FLAG.HEIGHT);
-  if (!tex) return;
-  const ctx = tex.getContext();
-  const poleX = (FLAG.WIDTH - 2) / 2;
-  // Pole with a knob on top.
-  ctx.fillStyle = PLACEHOLDER_COLORS.FLAG_POLE;
-  ctx.fillRect(poleX, 2, 2, FLAG.HEIGHT - 2);
-  ctx.fillRect(poleX - 1, 0, 4, 3);
-  // Pennant pointing right.
-  ctx.fillStyle = PLACEHOLDER_COLORS.FLAG_CLOTH;
-  for (let i = 0; i < 6; i++) {
-    ctx.fillRect(poleX + 2, 4 + i, 6 - i, 1);
-    ctx.fillRect(poleX + 2, 15 - i, 6 - i, 1);
+  createSheet(scene, TextureKey.PLAYER, Object.values(KNIGHT_FRAMES).flat(), KNIGHT_SIZE);
+  createSheet(scene, TextureKey.COIN, COIN_FRAMES, COIN.SIZE);
+  for (const [key, sprite] of [
+    [TextureKey.FLAG, FLAG],
+    [TextureKey.CHECKPOINT_OFF, CHECKPOINT_OFF],
+    [TextureKey.CHECKPOINT_ON, CHECKPOINT_ON],
+    [TextureKey.SPIKES, SPIKES],
+    [TextureKey.HEART_FULL, HEART_FULL],
+    [TextureKey.HEART_EMPTY, HEART_EMPTY],
+    [TextureKey.DUST, DUST],
+  ] as const) {
+    createImage(scene, key, sprite);
   }
+  createLayer(scene, TextureKey.BG_SKY, drawSky);
+  createLayer(scene, TextureKey.BG_CLOUDS, drawClouds);
+  createLayer(scene, TextureKey.BG_MOUNTAINS, drawMountains);
+  createLayer(scene, TextureKey.BG_HILLS, drawHills);
+  createAnimations(scene);
+}
+
+function createImage(scene: Phaser.Scene, key: string, sprite: Sprite): void {
+  const { width, height } = spriteSize(sprite);
+  const tex = scene.textures.createCanvas(key, width, height);
+  if (!tex) return;
+  paintSprite(tex.getContext(), sprite);
+  tex.refresh();
+}
+
+/** A horizontal strip of equal frames, addressable by frame index. */
+function createSheet(scene: Phaser.Scene, key: string, frames: readonly Sprite[], size: number): void {
+  const tex = scene.textures.createCanvas(key, size * frames.length, size);
+  if (!tex) return;
+  const ctx = tex.getContext();
+  frames.forEach((frame, i) => {
+    paintSprite(ctx, frame, i * size, 0);
+    tex.add(i, 0, i * size, 0, size, size);
+  });
   tex.refresh();
 }
 
 function createTileset(scene: Phaser.Scene): void {
-  const tex = scene.textures.createCanvas(
-    TextureKey.TILES,
-    TILE * TILESET_SIZE,
-    TILE,
-  );
+  const tex = scene.textures.createCanvas(TextureKey.TILES, TILE * TILESET_SIZE, TILE);
   if (!tex) return;
   const ctx = tex.getContext();
-
-  const tile = (id: number, draw: (x: number) => void) => draw(id * TILE);
-
-  tile(TileId.GROUND_TOP, (x) => {
-    ctx.fillStyle = PLACEHOLDER_COLORS.GROUND;
-    ctx.fillRect(x, 0, TILE, TILE);
-    ctx.fillStyle = PLACEHOLDER_COLORS.GROUND_TOP;
-    ctx.fillRect(x, 0, TILE, 4);
-  });
-  tile(TileId.GROUND, (x) => {
-    ctx.fillStyle = PLACEHOLDER_COLORS.GROUND;
-    ctx.fillRect(x, 0, TILE, TILE);
-  });
-  tile(TileId.BLOCK, (x) => {
-    ctx.fillStyle = PLACEHOLDER_COLORS.BLOCK;
-    ctx.fillRect(x, 0, TILE, TILE);
-    ctx.strokeStyle = "#000000";
-    ctx.strokeRect(x + 0.5, 0.5, TILE - 1, TILE - 1);
-  });
-  tile(TileId.WALL, (x) => {
-    ctx.fillStyle = PLACEHOLDER_COLORS.WALL;
-    ctx.fillRect(x, 0, TILE, TILE);
-  });
-
+  drawGroundTop(ctx, TileId.GROUND_TOP * TILE);
+  drawGround(ctx, TileId.GROUND * TILE);
+  drawBlock(ctx, TileId.BLOCK * TILE);
+  drawWall(ctx, TileId.WALL * TILE);
   tex.refresh();
 }
 
-function createPlayerTexture(scene: Phaser.Scene): void {
-  const tex = scene.textures.createCanvas(
-    TextureKey.PLAYER,
-    PLAYER.WIDTH,
-    PLAYER.HEIGHT,
-  );
+function createLayer(
+  scene: Phaser.Scene,
+  key: string,
+  draw: (ctx: CanvasRenderingContext2D) => void,
+): void {
+  const tex = scene.textures.createCanvas(key, LAYER_WIDTH, GAME_HEIGHT);
   if (!tex) return;
-  const ctx = tex.getContext();
-  // White body so state colors can be applied with tint.
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, PLAYER.WIDTH, PLAYER.HEIGHT);
-  // Eye on the right side to show facing direction.
-  ctx.fillStyle = "#222034";
-  ctx.fillRect(PLAYER.WIDTH - 4, 4, 2, 3);
+  draw(tex.getContext());
   tex.refresh();
+}
+
+function createAnimations(scene: Phaser.Scene): void {
+  // Frame indices follow the order of KNIGHT_FRAMES.
+  let index = 0;
+  const range = (n: number) => {
+    const frames = Array.from({ length: n }, (_, i) => ({ key: TextureKey.PLAYER, frame: index + i }));
+    index += n;
+    return frames;
+  };
+  const k = KNIGHT_FRAMES;
+  scene.anims.create({ key: AnimKey.KNIGHT_IDLE, frames: range(k.idle.length), frameRate: ANIM_FPS.idle, repeat: -1 });
+  scene.anims.create({ key: AnimKey.KNIGHT_RUN, frames: range(k.run.length), frameRate: ANIM_FPS.run, repeat: -1 });
+  scene.anims.create({ key: AnimKey.KNIGHT_JUMP, frames: range(k.jump.length) });
+  scene.anims.create({ key: AnimKey.KNIGHT_FALL, frames: range(k.fall.length) });
+  scene.anims.create({ key: AnimKey.KNIGHT_HURT, frames: range(k.hurt.length) });
+  scene.anims.create({
+    key: AnimKey.COIN_SPIN,
+    frames: COIN_FRAMES.map((_, i) => ({ key: TextureKey.COIN, frame: i })),
+    frameRate: ANIM_FPS.coin,
+    repeat: -1,
+  });
 }

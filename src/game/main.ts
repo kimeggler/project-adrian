@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { getAudioContext } from "@/lib/audioContext";
 import { BACKGROUND_COLOR, GAME_HEIGHT, GAME_WIDTH, PHYSICS } from "./config";
 import { BootScene } from "./scenes/BootScene";
 import { GameOverScene } from "./scenes/GameOverScene";
@@ -21,6 +22,8 @@ export function createGame(parent: HTMLElement, start: LevelStartData): Phaser.G
     height: GAME_HEIGHT,
     backgroundColor: BACKGROUND_COLOR,
     banner: false,
+    // Share the app's AudioContext, unlocked by the "Start game" click (AU-2).
+    audio: { context: getAudioContext() },
     render: {
       pixelArt: true,
       roundPixels: true,
@@ -50,6 +53,9 @@ export function createGame(parent: HTMLElement, start: LevelStartData): Phaser.G
   });
 
   game.registry.set(START_DATA_KEY, start);
+  // A previous game may have suspended the shared context; this only
+  // succeeds once the user has interacted with the page, which is fine.
+  void getAudioContext()?.resume().catch(() => {});
   fitIntegerZoom(game, parent);
   return game;
 }
