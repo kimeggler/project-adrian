@@ -19,6 +19,12 @@ export const SfxKey = {
   POWER_UP: "powerUp",
   POWER_DOWN: "powerDown",
   AXE_THROW: "axeThrow",
+  BLOCK_BREAK: "blockBreak",
+  BONUS: "bonus",
+  BOSS_SLAM: "bossSlam",
+  BOSS_HIT: "bossHit",
+  BOSS_DEFEAT: "bossDefeat",
+  GATE: "gate",
 } as const;
 
 export type SfxKeyValue = (typeof SfxKey)[keyof typeof SfxKey];

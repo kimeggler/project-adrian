@@ -5,7 +5,7 @@ describe("world skins", () => {
   it("have unique ids and a full set of tiles and layers", () => {
     expect(new Set(WORLDS.map((w) => w.id)).size).toBe(WORLDS.length);
     for (const w of WORLDS) {
-      expect(Object.values(w.tiles)).toHaveLength(4);
+      expect(Object.values(w.tiles)).toHaveLength(5);
       expect(Object.values(w.layers)).toHaveLength(4);
       for (const draw of [...Object.values(w.tiles), ...Object.values(w.layers)]) {
         expect(typeof draw).toBe("function");

@@ -31,6 +31,37 @@ export interface EnemySpawn {
   projectileSpeed: number;
 }
 
+/**
+ * A platform that rides back and forth over a pit (WO-10). Its top is level
+ * with the ground on both sides, so the player steps on at one end and off
+ * at the other.
+ */
+export interface MovingPlatform {
+  /** Left edge of the platform at each end of its path (px). */
+  fromX: number;
+  toX: number;
+  /** Top of the platform (px), the same as the ground surface. */
+  y: number;
+  /** Ledge columns on both sides (the reachability check links them). */
+  leftLedgeCol: number;
+  rightLedgeCol: number;
+}
+
+/** Boss fight at the end of every Nth level (CB-8). */
+export interface BossArena {
+  /** Gate columns: the left one closes behind the player, the right one opens on victory. */
+  leftGateCol: number;
+  rightGateCol: number;
+  /** Row of the arena floor's top tile. */
+  floorRow: number;
+  /** Boss start: bottom-center (px). */
+  bossX: number;
+  bossY: number;
+  hp: number;
+  /** Hearts lost on contact and per shockwave. */
+  damage: number;
+}
+
 /** Everything GameScene needs to build a level. */
 export interface Level {
   data: LevelData;
@@ -49,4 +80,10 @@ export interface Level {
   enemies: EnemySpawn[];
   /** Power-up items, by center point (CB-6). */
   powerUps: (Point & { kind: PowerUpKind })[];
+  /** WO-10 */
+  movingPlatforms: MovingPlatform[];
+  /** Invisible until bumped from below; by tile column and row. */
+  hiddenBlocks: { c: number; r: number }[];
+  /** Only on boss levels. */
+  boss?: BossArena;
 }

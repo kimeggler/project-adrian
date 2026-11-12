@@ -24,13 +24,15 @@ import {
   ITEM_SHIELD,
   ROCK,
   SLIME_FRAMES,
+  SLIME_KING_FRAMES,
+  BONUS_BLOCK_USED,
   TOTEM_FRAMES,
   SPIKES,
   type Sprite,
 } from "./art/sprites";
 import type { World } from "./worlds";
 import { CHARACTERS, type CharacterId } from "./characters";
-import { COIN, ENEMY, GAME_HEIGHT, POWERUP, TILE, TOUCH } from "./config";
+import { BOSS, COIN, ENEMY, GAME_HEIGHT, PLATFORM, POWERUP, TILE, TOUCH } from "./config";
 import { TileId, TILESET_SIZE } from "./tiles";
 
 export const TextureKey = {
@@ -44,6 +46,10 @@ export const TextureKey = {
   ITEM_AXE: "item-axe",
   AXE_SPIN: "axe-spin",
   SHIELD_BUBBLE: "shield-bubble",
+  SLIME_KING: "slime-king",
+  BONUS_BLOCK: "bonus-block",
+  PLATFORM: "moving-platform",
+  GATE: "gate",
   FLAG: "flag",
   CHECKPOINT_OFF: "checkpoint-off",
   CHECKPOINT_ON: "checkpoint-on",
@@ -68,7 +74,11 @@ export const AnimKey = {
   COIN_SPIN: "coin-spin",
   SLIME_WALK: "slime-walk",
   AXE_SPIN: "axe-spin",
+  SLIME_KING_IDLE: "slime-king-idle",
 } as const;
+
+/** Frame index of the airborne Slime King in its sheet. */
+export const SLIME_KING_AIR_FRAME = SLIME_KING_FRAMES.idle.length;
 
 /** Frame index of the squashed slime in the slime sheet. */
 export const SLIME_SQUASHED_FRAME = SLIME_FRAMES.walk.length;
@@ -99,6 +109,9 @@ export function createTextures(scene: Phaser.Scene, world: World): void {
   createSheet(scene, TextureKey.TOTEM, [...TOTEM_FRAMES.idle, ...TOTEM_FRAMES.charge], ENEMY.SIZE);
   createSheet(scene, TextureKey.AXE_SPIN, AXE_SPIN_FRAMES, POWERUP.ITEM_SIZE);
   createShieldBubble(scene);
+  createSheet(scene, TextureKey.SLIME_KING, [...SLIME_KING_FRAMES.idle, ...SLIME_KING_FRAMES.air], BOSS.WIDTH, BOSS.HEIGHT);
+  createPlatform(scene);
+  createGate(scene);
   for (const [key, sprite] of [
     [TextureKey.FLAG, FLAG],
     [TextureKey.CHECKPOINT_OFF, CHECKPOINT_OFF],
@@ -112,6 +125,7 @@ export function createTextures(scene: Phaser.Scene, world: World): void {
     [TextureKey.ITEM_BOOTS, ITEM_BOOTS],
     [TextureKey.ITEM_SHIELD, ITEM_SHIELD],
     [TextureKey.ITEM_AXE, ITEM_AXE],
+    [TextureKey.BONUS_BLOCK, BONUS_BLOCK_USED],
   ] as const) {
     createImage(scene, key, sprite);
   }
@@ -136,14 +150,56 @@ function createImage(scene: Phaser.Scene, key: string, sprite: Sprite): void {
 }
 
 /** A horizontal strip of equal frames, addressable by frame index. */
-function createSheet(scene: Phaser.Scene, key: string, frames: readonly Sprite[], size: number): void {
-  const tex = scene.textures.createCanvas(key, size * frames.length, size);
+function createSheet(
+  scene: Phaser.Scene,
+  key: string,
+  frames: readonly Sprite[],
+  size: number,
+  height: number = size,
+): void {
+  const tex = scene.textures.createCanvas(key, size * frames.length, height);
   if (!tex) return;
   const ctx = tex.getContext();
   frames.forEach((frame, i) => {
     paintSprite(ctx, frame, i * size, 0);
-    tex.add(i, 0, i * size, 0, size, size);
+    tex.add(i, 0, i * size, 0, size, height);
   });
+  tex.refresh();
+}
+
+/** Moving platform (WO-10): wooden planks on an iron frame, same in every world. */
+function createPlatform(scene: Phaser.Scene): void {
+  const w = PLATFORM.WIDTH;
+  const h = PLATFORM.HEIGHT;
+  const tex = scene.textures.createCanvas(TextureKey.PLATFORM, w, h);
+  if (!tex) return;
+  const ctx = tex.getContext();
+  const fill = (color: string, x: number, y: number, fw: number, fh: number) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, fw, fh);
+  };
+  fill("#222034", 0, 0, w, h);
+  fill("#8f563b", 1, 1, w - 2, h - 3);
+  fill("#d9a066", 1, 1, w - 2, 1);
+  for (let x = 8; x < w - 1; x += 8) fill("#663931", x, 1, 1, h - 3);
+  fill("#847e87", 0, h - 2, w, 2);
+  for (const x of [2, w - 4]) fill("#cbdbfc", x, 3, 2, 2);
+  tex.refresh();
+}
+
+/** Boss arena gate (CB-8): an iron portcullis tile, same in every world. */
+function createGate(scene: Phaser.Scene): void {
+  const tex = scene.textures.createCanvas(TextureKey.GATE, TILE, TILE);
+  if (!tex) return;
+  const ctx = tex.getContext();
+  ctx.fillStyle = "#222034";
+  for (const x of [1, 6, 11]) ctx.fillRect(x, 0, 4, TILE);
+  ctx.fillRect(0, 6, TILE, 4);
+  ctx.fillStyle = "#847e87";
+  for (const x of [2, 7, 12]) ctx.fillRect(x, 0, 2, TILE);
+  ctx.fillRect(0, 7, TILE, 2);
+  ctx.fillStyle = "#cbdbfc";
+  for (const x of [2, 7, 12]) ctx.fillRect(x, 7, 2, 2);
   tex.refresh();
 }
 
@@ -191,6 +247,9 @@ function createTileset(scene: Phaser.Scene, { tiles }: World): void {
   tiles.ground(ctx, TileId.GROUND * TILE);
   tiles.block(ctx, TileId.BLOCK * TILE);
   tiles.wall(ctx, TileId.WALL * TILE);
+  tiles.breakable(ctx, TileId.BREAKABLE * TILE);
+  // Frames, so single tiles can be shown as images (e.g. flying debris).
+  for (let i = 0; i < TILESET_SIZE; i++) tex.add(i, 0, i * TILE, 0, TILE, TILE);
   tex.refresh();
 }
 
@@ -230,6 +289,12 @@ function createAnimations(scene: Phaser.Scene): void {
     key: AnimKey.SLIME_WALK,
     frames: SLIME_FRAMES.walk.map((_, i) => ({ key: TextureKey.SLIME, frame: i })),
     frameRate: ENEMY.WALK_FPS,
+    repeat: -1,
+  });
+  scene.anims.create({
+    key: AnimKey.SLIME_KING_IDLE,
+    frames: SLIME_KING_FRAMES.idle.map((_, i) => ({ key: TextureKey.SLIME_KING, frame: i })),
+    frameRate: 3,
     repeat: -1,
   });
   scene.anims.create({

@@ -44,6 +44,7 @@ export default function WorldPreview({ world }: { world: World }) {
     for (let y = 0; y < groundY; y += TILE) tile(tiles.wall, 0, y);
     for (let x = 0; x < W; x += TILE) tile(x === 0 ? tiles.ground : tiles.groundTop, x, groundY);
     tile(tiles.block, 56, 20);
+    tile(tiles.breakable, 72, 20);
   }, [world]);
 
   return (

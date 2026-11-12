@@ -67,12 +67,29 @@ export function drawWall(ctx: Ctx, ox: number): void {
   brick(13, 8, 3);
 }
 
-/** One world's four tiles (same slots as TileId). */
+/** Dark crack lines across a block, so breakable blocks stand out (WO-10). */
+function cracks(ctx: Ctx, ox: number, color: string): void {
+  const lines: [number, number][][] = [
+    [[4, 2], [5, 3], [5, 4], [6, 5], [7, 6], [7, 7], [8, 8]],
+    [[8, 8], [9, 9], [11, 9], [12, 10], [13, 11]],
+    [[8, 8], [7, 9], [7, 10], [6, 11], [5, 12], [5, 13]],
+    [[10, 3], [10, 4], [11, 5]],
+  ];
+  for (const line of lines) for (const [x, y] of line) px(ctx, color, ox + x, y);
+}
+
+export function drawBreakableBlock(ctx: Ctx, ox: number): void {
+  drawBlock(ctx, ox);
+  cracks(ctx, ox, PALETTE.O);
+}
+
+/** One world's tiles (same slots as TileId). */
 export interface TileArt {
   groundTop: (ctx: Ctx, ox: number) => void;
   ground: (ctx: Ctx, ox: number) => void;
   block: (ctx: Ctx, ox: number) => void;
   wall: (ctx: Ctx, ox: number) => void;
+  breakable: (ctx: Ctx, ox: number) => void;
 }
 
 export const MEADOW_TILES: TileArt = {
@@ -80,6 +97,7 @@ export const MEADOW_TILES: TileArt = {
   ground: drawGround,
   block: drawBlock,
   wall: drawWall,
+  breakable: drawBreakableBlock,
 };
 
 // ---------------------------------------------------------------------------
@@ -157,9 +175,16 @@ export function drawDungeonWall(ctx: Ctx, ox: number): void {
   brick(13, 8, 3);
 }
 
+/** A cracked, rotten crate. */
+export function drawBrokenCrate(ctx: Ctx, ox: number): void {
+  drawCrate(ctx, ox);
+  cracks(ctx, ox, DUNGEON.mortar);
+}
+
 export const DUNGEON_TILES: TileArt = {
   groundTop: drawDungeonFloor,
   ground: drawDungeonStone,
   block: drawCrate,
   wall: drawDungeonWall,
+  breakable: drawBrokenCrate,
 };

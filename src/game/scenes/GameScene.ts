@@ -17,6 +17,9 @@ import {
   TILE,
   WORLD,
 } from "../config";
+import { BossEvent } from "../entities/Boss";
+import { BossArena } from "../entities/BossArena";
+import { MovingPlatform } from "../entities/MovingPlatform";
 import { Player, PlayerEvent } from "../entities/Player";
 import type { Enemy } from "../entities/Enemy";
 import { Jumper } from "../entities/Jumper";
@@ -38,7 +41,8 @@ import { getCharacter, type Character } from "../characters";
 import { getSave, getSettings, recordProgress } from "../systems/Save";
 import { coinPoints, timeBonus } from "../systems/Score";
 import { AnimKey, TextureKey } from "../textures";
-import { SOLID_TILES } from "../tiles";
+import { SOLID_TILES, TileId } from "../tiles";
+import { textStyle } from "../ui/font";
 import type { HudState, LevelResult, LevelStartData } from "../types";
 import { onKeyPress, pauseToggleEvents } from "../utils/keys";
 import { SceneKey } from "./keys";
@@ -71,6 +75,14 @@ export class GameScene extends Phaser.Scene {
   /** Enemies defeated in this level (stomp or sword). */
   private stomps = 0;
   private enemies: Enemy[] = [];
+  /** Points from blocks and the boss in this level (WO-10, CB-8). */
+  private bonusPoints = 0;
+  private layer!: Phaser.Tilemaps.TilemapLayer | Phaser.Tilemaps.TilemapGPULayer;
+  private platforms: MovingPlatform[] = [];
+  private arena?: BossArena;
+  /** Stomp hit ids for the boss (one hit per stomp). */
+  private stompHits = 0;
+  private debris?: Phaser.GameObjects.Particles.ParticleEmitter;
   private projectiles!: Phaser.Physics.Arcade.Group;
   private axes!: Phaser.Physics.Arcade.Group;
   /** Message for the HUD to show once (e.g. a sword upgrade). */
@@ -98,6 +110,9 @@ export class GameScene extends Phaser.Scene {
     this.coins = 0;
     this.stomps = 0;
     this.enemies = [];
+    this.bonusPoints = 0;
+    this.platforms = [];
+    this.arena = undefined;
     this.toast = undefined;
     this.swordDebug = undefined; // destroyed with the previous level's objects
     this.livesAtStart = data.lives ?? HEALTH.START_LIVES;
@@ -129,6 +144,7 @@ export class GameScene extends Phaser.Scene {
     const layer = map.createLayer(0, tileset, 0, 0);
     if (!layer) throw new Error("Tile layer could not be created");
     layer.setCollision(SOLID_TILES);
+    this.layer = layer;
 
     // --- Objects ---------------------------------------------------------------
     const flagSprite = this.addStaticObject(flag, TextureKey.FLAG, FLAG.HITBOX_WIDTH, FLAG.HEIGHT);
@@ -185,7 +201,10 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, items, (_p, item) => this.onPowerUp(item as Phaser.Physics.Arcade.Image));
 
     this.axes = this.physics.add.group();
-    this.physics.add.collider(this.axes, layer, (a) => (a as ThrownAxe).destroy());
+    this.physics.add.collider(this.axes, layer, (a, tile) => {
+      if ((tile as Phaser.Tilemaps.Tile).index === TileId.BREAKABLE) this.breakTile(tile as Phaser.Tilemaps.Tile);
+      (a as ThrownAxe).destroy();
+    });
 
     this.projectiles = this.physics.add.group({ allowGravity: false });
     this.physics.add.collider(this.projectiles, layer, (p) => (p as Projectile).destroy());
@@ -195,11 +214,16 @@ export class GameScene extends Phaser.Scene {
       this.onCoin(coin as Phaser.Physics.Arcade.Image),
     );
 
+    this.createWorldVariety();
+
     // Run the player controller once per fixed physics step.
     const world = this.physics.world;
     const onStep = (dt: number) => {
       this.elapsedMs += dt * 1000;
+      for (const p of this.platforms) p.step(dt);
       this.player.step(dt);
+      this.checkHeadBump();
+      this.arena?.step(dt, this.player);
       for (const e of this.enemies) e.step(dt, this.player);
       for (const p of this.projectiles.getChildren() as Projectile[]) p.step();
       this.checkAxeHits();
@@ -305,7 +329,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Run score so far: earlier levels plus coins in this level. */
   private get currentScore(): number {
-    return this.scoreAtStart + coinPoints(this.coins) + this.stomps * SCORE.ENEMY_POINTS;
+    return this.scoreAtStart + coinPoints(this.coins) + this.stomps * SCORE.ENEMY_POINTS + this.bonusPoints;
   }
 
   private sameLevel(): LevelStartData {
@@ -473,6 +497,15 @@ export class GameScene extends Phaser.Scene {
         playSfx(this, SfxKey.ENEMY_HIT);
         continue;
       }
+      const boss = this.arena?.boss;
+      if (boss?.alive && overlaps(box, rect(boss.body))) {
+        const result = boss.hit(axe.hitId, POWERUP.AXE_DAMAGE, axe.x);
+        if (result) {
+          axe.destroy();
+          this.onBossHit(result);
+          continue;
+        }
+      }
       for (const e of [...this.enemies]) {
         if (!overlaps(box, rect(e.body))) continue;
         const result = e.swordHit(axe.hitId, POWERUP.AXE_DAMAGE, axe.x);
@@ -487,6 +520,164 @@ export class GameScene extends Phaser.Scene {
         break;
       }
     }
+  }
+
+  /** Boss health for the HUD while the fight is on (CB-8). */
+  get bossBar(): { name: string; hp: number; maxHp: number } | undefined {
+    const a = this.arena;
+    if (!a?.fighting) return undefined;
+    return { name: "SLIME KING", hp: a.boss.hp, maxHp: a.boss.maxHp };
+  }
+
+  /**
+   * WO-10 and CB-8: moving platforms, hidden bonus blocks and the boss arena.
+   * Called after the player, enemies and projectile groups exist.
+   */
+  private createWorldVariety(): void {
+    const level = this.level;
+
+    // Moving platforms.
+    this.platforms = level.movingPlatforms.map((spec) => new MovingPlatform(this, spec));
+    this.physics.add.collider(this.player, this.platforms);
+
+    // Hidden bonus blocks: no collision until hit from below, then solid.
+    const hidden = this.physics.add.staticGroup();
+    for (const { c, r } of level.hiddenBlocks) {
+      const img = this.physics.add.staticImage(c * TILE + TILE / 2, r * TILE + TILE / 2, TextureKey.BONUS_BLOCK);
+      img.setVisible(false);
+      hidden.add(img);
+    }
+    const pb = this.player.body;
+    this.physics.add.collider(
+      this.player,
+      hidden,
+      (_p, b) => this.revealBlock(b as Phaser.Physics.Arcade.Image),
+      (_p, b) => {
+        const block = b as Phaser.Physics.Arcade.Image;
+        if (block.getData("revealed")) return true;
+        // Only a jump into its underside reveals it; otherwise pass through.
+        return pb.velocity.y < 0 && pb.prev.y >= block.body!.bottom - 1;
+      },
+    );
+
+    // Debris from broken blocks: little copies of the cracked tile.
+    this.debris = this.add.particles(0, 0, TextureKey.TILES, {
+      frame: TileId.BREAKABLE,
+      emitting: false,
+      lifespan: 600,
+      speed: { min: 60, max: 120 },
+      angle: { min: 220, max: 320 },
+      gravityY: 500,
+      scale: { start: 0.35, end: 0.2 },
+      rotate: { min: 0, max: 360 },
+    });
+
+    // Boss arena.
+    if (!level.boss) return;
+    const arena = (this.arena = new BossArena(this, level.boss, (event) => {
+      if (event === "closed") {
+        playSfx(this, SfxKey.GATE);
+        this.shake();
+        this.addToast("THE SLIME KING!");
+      } else {
+        playSfx(this, SfxKey.GATE);
+      }
+    }));
+    const boss = arena.boss;
+    this.physics.add.collider(boss, this.layer);
+    this.physics.add.collider(boss, arena.gates);
+    this.physics.add.collider(this.player, arena.gates);
+    this.physics.add.collider(this.projectiles, arena.gates, (p) => (p as Projectile).destroy());
+    this.physics.add.collider(this.axes, arena.gates, (a) => (a as ThrownAxe).destroy());
+    this.physics.add.overlap(this.player, boss, () => this.onBossContact());
+    boss.on(BossEvent.SLAM, (x: number, floorY: number, speed: number) => {
+      playSfx(this, SfxKey.BOSS_SLAM);
+      this.shake();
+      this.dust?.explode(JUICE.DUST_LAND * 2, x, floorY - 1);
+      for (const dir of [-1, 1] as const) {
+        const rock = new Projectile(this, x + dir * 14, floorY - 4, dir, speed, boss.damage);
+        this.projectiles.add(rock);
+        rock.launch();
+      }
+    });
+  }
+
+  /** Jumping into a hidden block's underside: it appears and pays out. */
+  private revealBlock(block: Phaser.Physics.Arcade.Image): void {
+    if (block.getData("revealed")) return;
+    block.setData("revealed", true).setVisible(true);
+    this.tweens.add({ targets: block, y: block.y - 4, duration: 80, yoyo: true });
+    this.bonusPoints += SCORE.HIDDEN_BLOCK_POINTS;
+    playSfx(this, SfxKey.BONUS);
+    this.popText(`+${SCORE.HIDDEN_BLOCK_POINTS}`, block.x, block.y - TILE);
+    const coin = this.add.sprite(block.x, block.y - TILE / 2, TextureKey.COIN).play(AnimKey.COIN_SPIN);
+    this.tweens.add({ targets: coin, y: coin.y - 24, alpha: 0, duration: 500, onComplete: () => coin.destroy() });
+  }
+
+  /** Breaking a cracked block with the sword, an axe or a head bump. */
+  private breakTile(tile: Phaser.Tilemaps.Tile): void {
+    if (tile.index !== TileId.BREAKABLE) return;
+    this.layer.removeTileAt(tile.x, tile.y);
+    this.debris?.explode(6, tile.pixelX + TILE / 2, tile.pixelY + TILE / 2);
+    this.bonusPoints += SCORE.BLOCK_POINTS;
+    playSfx(this, SfxKey.BLOCK_BREAK);
+  }
+
+  /** Head bumped into a cracked block from below: it breaks. */
+  private checkHeadBump(): void {
+    const b = this.player.body;
+    if (!b.blocked.up) return;
+    for (const x of [b.left + 1, b.right - 1]) {
+      const tile = this.layer.getTileAtWorldXY(x, b.top - 1);
+      if (tile?.index === TileId.BREAKABLE) this.breakTile(tile);
+    }
+  }
+
+  /** Small score text that floats up and fades. */
+  private popText(text: string, x: number, y: number): void {
+    const t = this.add
+      .text(x, y, text, textStyle({ color: "#fbf236", stroke: "#000000", strokeThickness: 2 }))
+      .setOrigin(0.5)
+      .setDepth(20);
+    this.tweens.add({ targets: t, y: y - 12, alpha: 0, duration: 700, onComplete: () => t.destroy() });
+  }
+
+  /** Touching the boss: a stomp hurts it, otherwise it hurts the player. */
+  private onBossContact(): void {
+    const boss = this.arena?.boss;
+    if (this.phase !== "playing" || !boss?.alive) return;
+    const pb = this.player.body;
+    const stomped = isStomp({ playerPrevBottom: pb.prev.y + pb.height, playerVy: pb.velocity.y, enemyTop: boss.body.top });
+    if (stomped) {
+      this.player.bounce();
+      const result = boss.hit(1e9 + ++this.stompHits, 1, this.player.x);
+      if (result) this.onBossHit(result);
+      else playSfx(this, SfxKey.STOMP);
+      return;
+    }
+    if (this.player.shielded) return; // the shield blocks it, but can't push a king
+    if (!this.player.hurt(boss.x)) return;
+    const outcome = this.health.damage(boss.damage);
+    if (outcome === "hurt") playSfx(this, SfxKey.HURT);
+    this.handleOutcome(outcome);
+  }
+
+  private onBossHit(result: "hit" | "defeated"): void {
+    const boss = this.arena!.boss;
+    if (result === "hit") {
+      playSfx(this, SfxKey.BOSS_HIT);
+      return;
+    }
+    playSfx(this, SfxKey.BOSS_DEFEAT);
+    this.shake();
+    for (let i = 0; i < 4; i++) {
+      this.time.delayedCall(i * 120, () => this.dust?.explode(JUICE.DUST_LAND * 2, boss.x + (i - 1.5) * 8, boss.y - 8));
+    }
+    this.projectiles.clear(true, true);
+    this.bonusPoints += SCORE.BOSS_POINTS;
+    this.popText(`+${SCORE.BOSS_POINTS}`, boss.x, boss.y - 32);
+    this.addToast("VICTORY!");
+    this.time.delayedCall(900, () => this.arena?.open());
   }
 
   /** Queue a HUD announcement; messages in the same frame are shown together. */
@@ -512,6 +703,18 @@ export class GameScene extends Phaser.Scene {
       if (!overlaps(box, { x: b.left, y: b.top, width: b.width, height: b.height })) continue;
       p.destroy();
       playSfx(this, SfxKey.ENEMY_HIT);
+    }
+    // Break cracked blocks (WO-10).
+    for (const tile of this.layer.getTilesWithinWorldXY(box.x, box.y, box.width, box.height)) {
+      if (tile.index === TileId.BREAKABLE) this.breakTile(tile);
+    }
+    const boss = this.arena?.boss;
+    if (boss?.alive) {
+      const b = boss.body;
+      if (overlaps(box, { x: b.left, y: b.top, width: b.width, height: b.height })) {
+        const result = boss.hit(this.player.swing, this.player.swordDamage, this.player.x);
+        if (result) this.onBossHit(result);
+      }
     }
     for (const w of [...this.enemies]) {
       const b = w.body;
@@ -591,6 +794,11 @@ export class GameScene extends Phaser.Scene {
       }
       const { x, y } = this.respawnPoint;
       this.player.respawn(x, y, true);
+      if (this.arena) {
+        this.arena.reset();
+        // Shockwaves still flying would hit the player right away.
+        this.projectiles.clear(true, true);
+      }
       this.physics.resume();
       this.phase = "playing";
     });

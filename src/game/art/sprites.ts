@@ -507,3 +507,118 @@ export const AXE_SPIN_FRAMES: readonly Sprite[] = [
   rotate(rotate(ITEM_AXE)),
   rotate(rotate(rotate(ITEM_AXE))),
 ];
+
+// ---------------------------------------------------------------------------
+// Boss (CB-8): the Slime King, 32×24, facing right
+// ---------------------------------------------------------------------------
+
+const SLIME_KING_A: Sprite = [
+  "................................",
+  "................................",
+  "................................",
+  "...........Y..Y..Y..Y...........",
+  "...........YY.YY.YY.Y...........",
+  "...........YYYYYYYYYY...........",
+  "...........yYRYyYRYyY...........",
+  "...........yyyyyyyyyy...........",
+  "..........OOOOOOOOOOOO..........",
+  "........OOVVVVVVVVVVVvOO........",
+  ".......OVMMVVVVVVVVVVVvvO.......",
+  ".....OOVMMVVVVVVVVVVVVvvvOO.....",
+  "....OVVVMVVVVVVVVVVVVVVvvvvO....",
+  "....OVVVVVVVOOVVVVVVOOVvvvvO....",
+  "...OVVVVVVVVWWWVVVVWWWVVvvvvO...",
+  "..OVVVVVVVVVWWOVVVVWWOVVvvvvvO..",
+  "..OVVVVVVVVVWWOVVVVWWOVVVvvvvO..",
+  ".OVVVVVVVVVVVVVVVVVVVVVVVvvvvvO.",
+  ".OVVVVVVVVVVVVOVVVVOVVVVVvvvvvO.",
+  ".OVVVVVVVVVVVVOOOOOOVVVVVvvvvvO.",
+  ".OvvvvvvvvvvvvvvvvvvvvvvvvvvvvO.",
+  ".OvvvvvvvvvvvvvvvvvvvvvvvvvvvvO.",
+  ".OvvvvvvvvvvvvvvvvvvvvvvvvvvvvO.",
+  "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+];
+
+const SLIME_KING_B: Sprite = [
+  "................................",
+  "................................",
+  "................................",
+  "................................",
+  "................................",
+  "...........Y..Y..Y..Y...........",
+  "...........YY.YY.YY.Y...........",
+  "...........YYYYYYYYYY...........",
+  "...........yYRYyYRYyY...........",
+  "...........yyyyyyyyyy...........",
+  "..........OOOOOOOOOOOO..........",
+  "........OOVVVVVVVVVVVvOO........",
+  "......OOVMMVVVVVVVVVVVvvOO......",
+  ".....OVVMMVVVVVVVVVVVVVvvvO.....",
+  "....OVVVMVVVOOVVVVVVOOVvvvvO....",
+  "...OVVVVVVVVWWWVVVVWWWVVvvvvO...",
+  "..OVVVVVVVVVWWOVVVVWWOVVvvvvvO..",
+  "..OVVVVVVVVVWWOVVVVWWOVVVvvvvO..",
+  ".OVVVVVVVVVVVVVVVVVVVVVVVvvvvvO.",
+  ".OVVVVVVVVVVVVOVVVVOVVVVVvvvvvO.",
+  ".OvvvvvvvvvvvvOOOOOOvvvvvvvvvvO.",
+  ".OvvvvvvvvvvvvvvvvvvvvvvvvvvvvO.",
+  ".OvvvvvvvvvvvvvvvvvvvvvvvvvvvvO.",
+  "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+];
+
+const SLIME_KING_AIR: Sprite = [
+  "................................",
+  "...........Y..Y..Y..Y...........",
+  "...........YY.YY.YY.Y...........",
+  "...........YYYYYYYYYY...........",
+  "...........yYRYyYRYyY...........",
+  "...........yyyyyyyyyy...........",
+  "...........OOOOOOOOOO...........",
+  "..........OVVVVVVVVVvO..........",
+  "........OOMVVVVVVVVVVvOO........",
+  ".......OMMVVVVVVVVVVVvvvO.......",
+  "......OVMVVVVVVVVVVVVVvvvO......",
+  "......OVVVVVVVVVVVVVVVvvvO......",
+  ".....OVVVVVVOOVVVVVVOOVvvvO.....",
+  ".....OVVVVVVWWWVVVVWWWVvvvO.....",
+  "....OVVVVVVVWWOVVVVWWOVvvvvO....",
+  "....OVVVVVVVWWOVVVVWWOVvvvvO....",
+  "...OVVVVVVVVVVVVVVVVVVVVvvvvO...",
+  "...OVVVVVVVVVVOVVVVOVVVVvvvvO...",
+  "...OVVVVVVVVVVOOOOOOVVVVvvvvO...",
+  "...OVVVVVVVVVVVVVVVVVVVVvvvvO...",
+  "...OvvvvvvvvvvvvvvvvvvvvvvvvO...",
+  "...OvvvvvvvvvvvvvvvvvvvvvvvvO...",
+  "...OvvvvvvvvvvvvvvvvvvvvvvvvO...",
+  "..OOOOOOOOOOOOOOOOOOOOOOOOOOOO..",
+];
+
+/** Idle (two frames, a slow wobble) and in the air (taller and narrower). */
+export const SLIME_KING_FRAMES = {
+  idle: [SLIME_KING_A, SLIME_KING_B],
+  air: [SLIME_KING_AIR],
+} as const;
+
+// ---------------------------------------------------------------------------
+// Blocks (WO-10)
+// ---------------------------------------------------------------------------
+
+/** A hidden bonus block after it was bumped: steel with a golden gem. */
+export const BONUS_BLOCK_USED: Sprite = [
+  "OOOOOOOOOOOOOOOO",
+  "OhhhhhhhhhhhhhhO",
+  "OhHHHHHHHHHHHHsO",
+  "OhHsHHHHHHHHsHsO",
+  "OhHHHHHOOHHHHHsO",
+  "OhHHHHOYYOHHHHsO",
+  "OhHHHOYWYyOHHHsO",
+  "OhHHOYWYYyyOHHsO",
+  "OhHHOYYYYyyOHHsO",
+  "OhHHHOYYyyOHHHsO",
+  "OhHHHHOyyOHHHHsO",
+  "OhHHHHHOOHHHHHsO",
+  "OhHsHHHHHHHHsHsO",
+  "OhHHHHHHHHHHHHsO",
+  "OhsssssssssssssO",
+  "OOOOOOOOOOOOOOOO",
+];

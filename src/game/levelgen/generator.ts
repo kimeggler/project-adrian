@@ -6,8 +6,13 @@
  * produces the same level.
  */
 import {
+  BLOCKS,
+  BOSS,
+  bossHp,
   difficultyFor,
   ENEMY,
+  isBossLevel,
+  PLATFORM,
   LEVELGEN,
   POWERUP,
   type PowerUpKind,
@@ -17,7 +22,7 @@ import {
   WORLD,
   type DifficultyRow,
 } from "../config";
-import type { EnemyKind, EnemySpawn, Level, Point } from "../levels/level";
+import type { EnemyKind, EnemySpawn, Level, MovingPlatform, Point } from "../levels/level";
 import { POWERUP_KINDS } from "../systems/PowerUps";
 import { TileId, type LevelData } from "../tiles";
 import { checkReachability } from "./reachability";
@@ -45,7 +50,7 @@ export function generateLevel(seed: number, levelNumber: number): GeneratedLevel
   const difficulty = difficultyFor(levelNumber);
   let level: Level | undefined;
   for (let attempt = 0; attempt < LEVELGEN.MAX_ATTEMPTS; attempt++) {
-    level = buildLevel(levelSeed(seed + attempt, levelNumber), difficulty);
+    level = buildLevel(levelSeed(seed + attempt, levelNumber), difficulty, levelNumber);
     if (checkReachability(level).reachable) {
       if (attempt > 0 && process.env.NODE_ENV === "development") {
         console.info(
@@ -66,6 +71,15 @@ function levelSeed(seed: number, levelNumber: number): number {
   return hash32(hash32(seed) ^ Math.imul(levelNumber, 0x27d4eb2d));
 }
 
+/** A floating-platform crossing: pit columns and the platform's blocks. */
+interface Crossing {
+  pitStart: number;
+  pitEnd: number;
+  blockKeys: string[];
+  /** Ground height on both sides. */
+  h: number;
+}
+
 /** Intermediate layout: ground heights per column plus extras. */
 interface Layout {
   ground: number[];
@@ -73,12 +87,42 @@ interface Layout {
   spikeCols: number[];
   coins: [number, number][];
   checkpointCol: number;
+  /** Extra checkpoints (the one before a boss arena). */
+  extraCheckpointCols: number[];
+  /** Platform crossings and obstacle columns (WO-10 post-processing). */
+  crossings: Crossing[];
+  obstacleCols: { col: number; keys: string[] }[];
+  /** Block keys that are breakable. */
+  breakable: Set<string>;
+  movingPlatforms: MovingPlatform[];
+  /** No enemies, power-ups or hidden blocks from this column on. */
+  reservedFrom: number;
+  /** First arena column (boss levels only). */
+  arenaStart?: number;
 }
 
 /** Builds one level from a PRNG seed. Exported for tests. */
-export function buildLevel(rngSeed: number, difficulty: DifficultyRow): Level {
-  const layout = buildLayout(new Rng(rngSeed), difficulty);
+export function buildLevel(rngSeed: number, difficulty: DifficultyRow, levelNumber = 1): Level {
+  const boss = isBossLevel(levelNumber);
+  const layout = buildLayout(new Rng(rngSeed), difficulty, boss);
+  // WO-10 features each use their own random stream, so the terrain, enemies
+  // and power-ups of a seed stay as they were before phase 12.
+  makeMovingPlatforms(layout, new Rng(hash32(rngSeed ^ 0x3a7f0c11)), difficulty);
+  makeBreakables(layout, new Rng(hash32(rngSeed ^ 0x51b2e6d4)), difficulty);
   const level = toLevel(layout);
+  if (boss && layout.arenaStart !== undefined) {
+    const floorRow = surfaceRow(BOSS.GROUND);
+    const right = layout.arenaStart + BOSS.ARENA_TILES - 1;
+    level.boss = {
+      leftGateCol: layout.arenaStart,
+      rightGateCol: right,
+      floorRow,
+      bossX: (right - 3) * TILE + TILE / 2,
+      bossY: floorRow * TILE,
+      hp: bossHp(levelNumber),
+      damage: difficulty.damage,
+    };
+  }
   // Enemies use their own random streams, so adding them didn't change the
   // terrain of any existing seed (phase 7), and choosing their kind didn't
   // change where they are (phase 9).
@@ -91,7 +135,80 @@ export function buildLevel(rngSeed: number, difficulty: DifficultyRow): Level {
   );
   // Power-ups: a fourth stream, so terrain and enemies stay the same (phase 10).
   level.powerUps = placePowerUps(level, layout, new Rng(hash32(rngSeed ^ 0x70e4a9b3)), difficulty);
+  level.hiddenBlocks = placeHiddenBlocks(level, layout, new Rng(hash32(rngSeed ^ 0x2c94f1a7)), difficulty);
   return level;
+}
+
+/**
+ * Turn some floating-platform crossings into a moving platform (WO-10): the
+ * static blocks go, and a platform level with the ground rides from one
+ * ledge to the other. Both ledges are at the same height, so the player
+ * steps on and off. Pits must be at least 3 tiles wide so it actually moves.
+ */
+function makeMovingPlatforms(layout: Layout, rng: Rng, diff: DifficultyRow): void {
+  for (const x of layout.crossings) {
+    if (!rng.chance(diff.movingChance)) continue;
+    if (x.pitEnd - x.pitStart + 1 < 3) continue;
+    for (const key of x.blockKeys) layout.blocks.delete(key);
+    layout.movingPlatforms.push({
+      fromX: x.pitStart * TILE,
+      toX: (x.pitEnd + 1) * TILE - PLATFORM.WIDTH,
+      y: surfaceRow(x.h) * TILE,
+      leftLedgeCol: x.pitStart - 1,
+      rightLedgeCol: x.pitEnd + 1,
+    });
+  }
+}
+
+/**
+ * Some obstacles are made of breakable blocks (WO-10). They stand on the
+ * ground and the level is beatable with them in place, so breaking them only
+ * ever opens the way; it can never strand the player.
+ */
+function makeBreakables(layout: Layout, rng: Rng, diff: DifficultyRow): void {
+  for (const { keys } of layout.obstacleCols) {
+    if (rng.chance(diff.breakableChance)) for (const key of keys) layout.breakable.add(key);
+  }
+}
+
+/**
+ * Hidden bonus blocks (WO-10): invisible until bumped from below. Each hangs
+ * BLOCKS.HIDDEN_ROWS_ABOVE tiles over flat, open ground with flat ground on
+ * both sides, so once it appears it is just a floating block the player can
+ * walk under: it can't block a jump the level needs.
+ */
+function placeHiddenBlocks(level: Level, layout: Layout, rng: Rng, diff: DifficultyRow): Level["hiddenBlocks"] {
+  const { ground, spikeCols, checkpointCol } = layout;
+  const spikes = new Set(spikeCols);
+  const coins = new Set(level.coins.map((p) => `${Math.floor(p.x / TILE)},${Math.floor(p.y / TILE)}`));
+  const items = new Set(level.powerUps.map((p) => Math.floor(p.x / TILE)));
+  const k = BLOCKS.HIDDEN_CLEARANCE;
+  const free = (c: number) => {
+    const g = ground[c];
+    if (g <= 0 || Math.abs(c - checkpointCol) <= k || items.has(c)) return false;
+    const row = surfaceRow(g) - BLOCKS.HIDDEN_ROWS_ABOVE;
+    if (row < 1 || coins.has(`${c},${row}`)) return false;
+    for (let cc = c - k; cc <= c + k; cc++) {
+      if (ground[cc] !== g || spikes.has(cc)) return false;
+      for (let r = row; r < surfaceRow(g); r++) if (level.data[r]?.[cc] !== TileId.EMPTY) return false;
+    }
+    return true;
+  };
+
+  const from = SAFE + k;
+  const to = layout.reservedFrom - k - 1;
+  const count = Math.max(0, diff.hiddenBlocks);
+  const sectionLen = Math.floor((to - from) / Math.max(1, count));
+  const blocks: Level["hiddenBlocks"] = [];
+  for (let i = 0; i < count; i++) {
+    const start = from + i * sectionLen;
+    const candidates: number[] = [];
+    for (let c = start; c < start + sectionLen; c++) if (free(c)) candidates.push(c);
+    if (candidates.length === 0) continue;
+    const c = candidates[rng.int(0, candidates.length - 1)];
+    blocks.push({ c, r: surfaceRow(ground[c]) - BLOCKS.HIDDEN_ROWS_ABOVE });
+  }
+  return blocks;
 }
 
 /**
@@ -113,7 +230,7 @@ function placeEnemies(
   const free = (c: number) => {
     const g = ground[c];
     if (g <= 0 || spikes.has(c)) return false;
-    if (c <= SAFE || c >= W - 1 - SAFE) return false;
+    if (c <= SAFE || c >= layout.reservedFrom) return false;
     if (Math.abs(c - checkpointCol) <= ENEMY.CHECKPOINT_CLEARANCE) return false;
     for (let k = 1; k <= LEVELGEN.MIN_HEADROOM; k++) {
       if (level.data[surfaceRow(g) - k]?.[c] !== TileId.EMPTY) return false;
@@ -159,12 +276,14 @@ function placeEnemies(
   return enemies;
 }
 
-function buildLayout(rng: Rng, diff: DifficultyRow): Layout {
+function buildLayout(rng: Rng, diff: DifficultyRow, boss = false): Layout {
   const ground: number[] = new Array(W).fill(0);
   const blocks = new Set<string>();
   const spikeCols: number[] = [];
   const coins: [number, number][] = [];
   let checkpointCol = -1;
+  const crossings: Crossing[] = [];
+  const obstacleCols: Layout["obstacleCols"] = [];
 
   const maxStep = maxStepTiles();
   const gapCap = Math.max(1, Math.min(diff.maxGap, maxGapTiles()));
@@ -172,7 +291,8 @@ function buildLayout(rng: Rng, diff: DifficultyRow): Layout {
 
   let x = 1; // column 0 is the left wall
   let h: number = LEVELGEN.START_GROUND;
-  const endStart = W - 1 - SAFE; // first column of the flat flag area
+  // First column of the flat flag area, or of the lobby before a boss arena.
+  const endStart = W - 1 - SAFE - (boss ? BOSS.ARENA_TILES + BOSS.LOBBY_TILES : 0);
 
   const put = (height: number) => {
     ground[x++] = height;
@@ -274,7 +394,10 @@ function buildLayout(rng: Rng, diff: DifficultyRow): Layout {
         flat(2, false);
         const top = surfaceRow(h) - height;
         for (let i = 0; i < width; i++) {
-          for (let r = top; r < surfaceRow(h); r++) blocks.add(`${x},${r}`);
+          const keys: string[] = [];
+          for (let r = top; r < surfaceRow(h); r++) keys.push(`${x},${r}`);
+          for (const key of keys) blocks.add(key);
+          obstacleCols.push({ col: x, keys });
           if (rng.chance(diff.coinChance)) coins.push([x, top - 1]);
           put(h);
         }
@@ -292,14 +415,18 @@ function buildLayout(rng: Rng, diff: DifficultyRow): Layout {
         const after = rng.int(1, gapCap);
         const landing = rng.int(3, 5);
         if (!fits(before + pw + after + landing)) break;
+        const pitStart = x;
+        const blockKeys: string[] = [];
         for (let i = 0; i < before; i++) put(0);
         const row = surfaceRow(platformHeight);
         for (let i = 0; i < pw; i++) {
           blocks.add(`${x},${row}`);
+          blockKeys.push(`${x},${row}`);
           if (rng.chance(diff.coinChance)) coins.push([x, row - 1]);
           put(0);
         }
         for (let i = 0; i < after; i++) put(0);
+        crossings.push({ pitStart, pitEnd: x - 1, blockKeys, h });
         flat(landing, false);
         continue;
       }
@@ -310,13 +437,39 @@ function buildLayout(rng: Rng, diff: DifficultyRow): Layout {
     flat(Math.min(3, endStart - x));
   }
 
+  // Boss level (CB-8): a short lobby with a checkpoint, then the flat arena.
+  // From the lobby (at height h) the arena floor is at most one step up.
+  const extraCheckpointCols: number[] = [];
+  let arenaStart: number | undefined;
+  if (boss) {
+    while (x < endStart) put(h);
+    extraCheckpointCols.push(x + Math.floor(BOSS.LOBBY_TILES / 2));
+    for (let i = 0; i < BOSS.LOBBY_TILES; i++) put(h);
+    h = BOSS.GROUND;
+    arenaStart = x;
+    for (let i = 0; i < BOSS.ARENA_TILES; i++) put(h);
+  }
+
   // Flag area (always flat and safe), then the right wall at W - 1.
   while (x < W - 1) put(h);
 
   // Fallback if the level was too short for the checkpoint loop.
   if (checkpointCol < 0) checkpointCol = SAFE - 2;
 
-  return { ground, blocks, spikeCols, coins, checkpointCol };
+  return {
+    ground,
+    blocks,
+    spikeCols,
+    coins,
+    checkpointCol,
+    extraCheckpointCols,
+    crossings,
+    obstacleCols,
+    breakable: new Set(),
+    movingPlatforms: [],
+    reservedFrom: boss ? endStart : W - 1 - SAFE,
+    arenaStart,
+  };
 }
 
 /**
@@ -341,7 +494,7 @@ function placePowerUps(level: Level, layout: Layout, rng: Rng, diff: DifficultyR
   };
 
   const from = SAFE + 4;
-  const to = W - 1 - SAFE - 4;
+  const to = layout.reservedFrom - 4;
   const sectionLen = Math.floor((to - from) / Math.max(1, diff.powerUps));
   const items: Level["powerUps"] = [];
   for (let i = 0; i < diff.powerUps; i++) {
@@ -357,7 +510,7 @@ function placePowerUps(level: Level, layout: Layout, rng: Rng, diff: DifficultyR
 }
 
 function toLevel(layout: Layout): Level {
-  const { ground, blocks, spikeCols, coins, checkpointCol } = layout;
+  const { ground, blocks, spikeCols, coins, checkpointCol, breakable } = layout;
 
   const data: LevelData = Array.from({ length: H }, () =>
     new Array<number>(W).fill(TileId.EMPTY),
@@ -371,7 +524,7 @@ function toLevel(layout: Layout): Level {
   }
   for (const key of blocks) {
     const [c, r] = key.split(",").map(Number);
-    data[r][c] = TileId.BLOCK;
+    data[r][c] = breakable.has(key) ? TileId.BREAKABLE : TileId.BLOCK;
   }
   for (let r = 0; r < H; r++) {
     data[r][0] = TileId.WALL;
@@ -402,9 +555,11 @@ function toLevel(layout: Layout): Level {
     spawn: { x: 3 * TILE, y: (H - LEVELGEN.START_GROUND) * TILE },
     flag: onGround(W - 1 - WORLD.FLAG_TILES_FROM_END),
     spikes: spikeCols.map(onGround),
-    checkpoints: [onGround(checkpointCol)],
+    checkpoints: [checkpointCol, ...layout.extraCheckpointCols].map(onGround),
     coins: coinPoints,
     enemies: [], // placed by placeEnemies()
     powerUps: [], // placed by placePowerUps()
+    movingPlatforms: layout.movingPlatforms,
+    hiddenBlocks: [], // placed by placeHiddenBlocks()
   };
 }

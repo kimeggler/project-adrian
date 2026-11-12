@@ -141,6 +141,15 @@ export interface TerrainDifficulty {
   maxSpikes: number;
   /** Chance that a flat stretch gets a row of coins. */
   coinChance: number;
+  /**
+   * WO-10, each decided on its own random stream so the terrain above stays
+   * the same: chance that a floating-platform crossing becomes a moving
+   * platform, chance that an obstacle is made of breakable blocks, and how
+   * many hidden bonus blocks the level gets.
+   */
+  movingChance: number;
+  breakableChance: number;
+  hiddenBlocks: number;
 }
 
 export interface EnemyDifficulty {
@@ -165,13 +174,14 @@ export interface EnemyDifficulty {
 
 export type DifficultyRow = TerrainDifficulty & EnemyDifficulty;
 
+// prettier-ignore
 const TERRAIN_BY_LEVEL: readonly TerrainDifficulty[] = [
-  { flat: 4, step: 3, gap: 2, spikes: 1, obstacle: 2, platform: 0, maxGap: 2, maxSpikes: 1, coinChance: 0.5 },
-  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 1, maxGap: 2, maxSpikes: 1, coinChance: 0.5 },
-  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.5 },
-  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.45 },
-  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4 },
-  { flat: 1, step: 3, gap: 5, spikes: 4, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4 },
+  { flat: 4, step: 3, gap: 2, spikes: 1, obstacle: 2, platform: 0, maxGap: 2, maxSpikes: 1, coinChance: 0.5, movingChance: 0, breakableChance: 0.3, hiddenBlocks: 1 },
+  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 1, maxGap: 2, maxSpikes: 1, coinChance: 0.5, movingChance: 0.4, breakableChance: 0.4, hiddenBlocks: 1 },
+  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.5, movingChance: 0.45, breakableChance: 0.5, hiddenBlocks: 2 },
+  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.45, movingChance: 0.5, breakableChance: 0.5, hiddenBlocks: 2 },
+  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4, movingChance: 0.5, breakableChance: 0.5, hiddenBlocks: 2 },
+  { flat: 1, step: 3, gap: 5, spikes: 4, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4, movingChance: 0.6, breakableChance: 0.6, hiddenBlocks: 2 },
 ];
 
 // prettier-ignore
@@ -205,6 +215,10 @@ export function difficultyFor(level: number): DifficultyRow {
 
 export const SCORE = {
   COIN_POINTS: 10,
+  /** Breaking a breakable block, revealing a hidden block, beating a boss. */
+  BLOCK_POINTS: 10,
+  HIDDEN_BLOCK_POINTS: 100,
+  BOSS_POINTS: 1000,
   /** Points for stomping an enemy. */
   ENEMY_POINTS: 50,
   /** Time bonus when finishing instantly; falls linearly to 0 at par time. */
@@ -483,3 +497,72 @@ export const UI = {
   INPUT_DELAY_MS: 300,
 } as const;
 
+
+// ---------------------------------------------------------------------------
+// World variety (WO-10): moving platforms, breakable and hidden blocks
+// ---------------------------------------------------------------------------
+
+export const PLATFORM = {
+  /** Size of a moving platform (px). Its top is level with the ground. */
+  WIDTH: 32,
+  HEIGHT: 8,
+  SPEED: 40,
+  /** Rest at each end so the player can step on and off (ms). */
+  PAUSE_MS: 700,
+} as const;
+
+export const BLOCKS = {
+  /** Hidden blocks hang this many tiles above the ground (bump them from below). */
+  HIDDEN_ROWS_ABOVE: 4,
+  /** Flat, free ground needed on each side of a hidden block (tiles). */
+  HIDDEN_CLEARANCE: 2,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Boss (CB-8)
+// ---------------------------------------------------------------------------
+
+export const BOSS = {
+  /** A boss arena ends every Nth level. */
+  EVERY: 5,
+  /** Arena width in tiles, gates included. */
+  ARENA_TILES: 14,
+  /** Flat ground before the arena, with a checkpoint in the middle (tiles). */
+  LOBBY_TILES: 3,
+  /** The arena gate closes once the player is this far inside (tiles). */
+  CLOSE_AFTER_TILES: 2,
+  /** Arena ground height (tiles from the bottom). */
+  GROUND: 2,
+  /** Sprite frame and hitbox (px). */
+  WIDTH: 32,
+  HEIGHT: 24,
+  HITBOX_WIDTH: 26,
+  HITBOX_HEIGHT: 20,
+  /** Hit points: BASE_HP at the first boss, + HP_PER_BOSS for each later one. */
+  BASE_HP: 8,
+  HP_PER_BOSS: 4,
+  /** Can't be hurt again for this long after a hit (ms). */
+  INVULNERABLE_MS: 600,
+  /** Rest between moves (ms); shorter once below half HP. */
+  REST_MS: 800,
+  REST_MS_ENRAGED: 450,
+  /** Small hop towards the player. */
+  HOP_VX: 70,
+  HOP_VY: -180,
+  /** Every LEAP_EVERY-th move is a big leap at the player that ends in a slam. */
+  LEAP_EVERY: 3,
+  LEAP_VY: -320,
+  LEAP_MAX_VX: 120,
+  /** Shockwaves sent along the floor by a slam (px/s); faster when enraged. */
+  SHOCKWAVE_SPEED: 90,
+  SHOCKWAVE_SPEED_ENRAGED: 120,
+  /** Knockback when the player stomps it or hits it with the sword (px/s). */
+  KNOCKBACK_VX: 60,
+} as const;
+
+/** Is level `n` a boss level? */
+export const isBossLevel = (n: number): boolean => n > 0 && n % BOSS.EVERY === 0;
+
+/** Boss hit points on level `n`. */
+export const bossHp = (n: number): number =>
+  BOSS.BASE_HP + (Math.max(1, Math.floor(n / BOSS.EVERY)) - 1) * BOSS.HP_PER_BOSS;
