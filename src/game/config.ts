@@ -100,6 +100,39 @@ export const WORLD = {
   FLAG_TILES_FROM_END: 4,
 } as const;
 
+// ---------------------------------------------------------------------------
+// Health, damage and respawn (GP-1)
+// ---------------------------------------------------------------------------
+
+export const HEALTH = {
+  HEARTS_PER_LIFE: 3,
+  START_LIVES: 3,
+  /** Hearts lost when touching spikes. Pits always cost a whole life. */
+  SPIKE_DAMAGE: 1,
+  /** Invincibility after taking damage or respawning (ms). */
+  INVINCIBLE_MS: 1000,
+  /** Blink period of the invincibility flash (ms). */
+  BLINK_MS: 80,
+  /** Controls are locked for this long after a hit (ms). */
+  HURT_STUN_MS: 250,
+  KNOCKBACK_VX: 80, // px/s, away from the hazard
+  KNOCKBACK_VY: -200, // px/s
+  /** Pause between losing a life and respawning (ms). */
+  RESPAWN_DELAY_MS: 700,
+} as const;
+
+export const SPIKES = {
+  /** Hitbox (px), bottom-centered in the 16×16 tile. Smaller than the art, to be fair. */
+  HITBOX_WIDTH: 12,
+  HITBOX_HEIGHT: 6,
+} as const;
+
+export const CHECKPOINT = {
+  WIDTH: 16,
+  HEIGHT: 32,
+  HITBOX_WIDTH: 10,
+} as const;
+
 export const FLAG = {
   /** Placeholder sprite size (px): pole plus pennant. */
   WIDTH: 16,
@@ -137,6 +170,12 @@ export const PLACEHOLDER_COLORS = {
   WALL: "#3f3f74",
   FLAG_POLE: "#cbdbfc",
   FLAG_CLOTH: "#d95763",
+  CHECKPOINT_OFF: "#847e87",
+  CHECKPOINT_ON: "#37946e",
+  SPIKE: "#cbdbfc",
+  SPIKE_SHADE: "#847e87",
+  HEART: "#ac3232",
+  HEART_EMPTY: "#45283c",
   PLAYER: {
     idle: "#d9a066",
     run: "#df7126",

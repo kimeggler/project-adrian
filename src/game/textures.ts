@@ -1,11 +1,16 @@
 import type * as Phaser from "phaser";
-import { FLAG, PLACEHOLDER_COLORS, PLAYER, TILE } from "./config";
+import { CHECKPOINT, FLAG, PLACEHOLDER_COLORS, PLAYER, TILE } from "./config";
 import { TileId, TILESET_SIZE } from "./tiles";
 
 export const TextureKey = {
   TILES: "tiles",
   PLAYER: "player",
   FLAG: "flag",
+  CHECKPOINT_OFF: "checkpoint-off",
+  CHECKPOINT_ON: "checkpoint-on",
+  SPIKES: "spikes",
+  HEART_FULL: "heart-full",
+  HEART_EMPTY: "heart-empty",
 } as const;
 
 /**
@@ -16,6 +21,72 @@ export function createPlaceholderTextures(scene: Phaser.Scene): void {
   createTileset(scene);
   createPlayerTexture(scene);
   createFlagTexture(scene);
+  createCheckpointTexture(scene, TextureKey.CHECKPOINT_OFF, PLACEHOLDER_COLORS.CHECKPOINT_OFF);
+  createCheckpointTexture(scene, TextureKey.CHECKPOINT_ON, PLACEHOLDER_COLORS.CHECKPOINT_ON);
+  createSpikeTexture(scene);
+  createHeartTexture(scene, TextureKey.HEART_FULL, PLACEHOLDER_COLORS.HEART);
+  createHeartTexture(scene, TextureKey.HEART_EMPTY, PLACEHOLDER_COLORS.HEART_EMPTY);
+}
+
+/** Draw a pixel pattern: one string per row, "#" = filled. */
+function drawPattern(
+  ctx: CanvasRenderingContext2D,
+  pattern: string[],
+  color: string,
+  ox = 0,
+  oy = 0,
+): void {
+  ctx.fillStyle = color;
+  pattern.forEach((row, y) => {
+    [...row].forEach((c, x) => {
+      if (c === "#") ctx.fillRect(ox + x, oy + y, 1, 1);
+    });
+  });
+}
+
+function createCheckpointTexture(scene: Phaser.Scene, key: string, cloth: string): void {
+  const tex = scene.textures.createCanvas(key, CHECKPOINT.WIDTH, CHECKPOINT.HEIGHT);
+  if (!tex) return;
+  const ctx = tex.getContext();
+  const poleX = 4;
+  ctx.fillStyle = PLACEHOLDER_COLORS.FLAG_POLE;
+  ctx.fillRect(poleX, 1, 2, CHECKPOINT.HEIGHT - 1);
+  ctx.fillStyle = cloth;
+  ctx.fillRect(poleX + 2, 2, 8, 6);
+  tex.refresh();
+}
+
+function createSpikeTexture(scene: Phaser.Scene): void {
+  const tex = scene.textures.createCanvas(TextureKey.SPIKES, TILE, TILE);
+  if (!tex) return;
+  const ctx = tex.getContext();
+  // Two spikes in the bottom half of the tile.
+  const spike = [
+    "   #   ",
+    "   #   ",
+    "  ###  ",
+    "  ###  ",
+    " ##### ",
+    " ##### ",
+    "#######",
+    "#######",
+  ];
+  drawPattern(ctx, spike, PLACEHOLDER_COLORS.SPIKE, 0, 8);
+  drawPattern(ctx, spike, PLACEHOLDER_COLORS.SPIKE, 8, 8);
+  ctx.fillStyle = PLACEHOLDER_COLORS.SPIKE_SHADE;
+  ctx.fillRect(0, 15, TILE, 1);
+  tex.refresh();
+}
+
+function createHeartTexture(scene: Phaser.Scene, key: string, color: string): void {
+  const tex = scene.textures.createCanvas(key, 7, 6);
+  if (!tex) return;
+  drawPattern(
+    tex.getContext(),
+    [" ## ## ", "#######", "#######", " ##### ", "  ###  ", "   #   "],
+    color,
+  );
+  tex.refresh();
 }
 
 function createFlagTexture(scene: Phaser.Scene): void {

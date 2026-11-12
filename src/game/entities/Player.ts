@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { PHYSICS, PLACEHOLDER_COLORS, PLAYER } from "../config";
+import { HEALTH, PHYSICS, PLACEHOLDER_COLORS, PLAYER } from "../config";
 import { TextureKey } from "../textures";
 import type { PlayerInput } from "../systems/Input";
 
@@ -12,6 +12,7 @@ export interface PlayerDebugInfo {
   grounded: boolean;
   coyoteMs: number;
   bufferMs: number;
+  invincibleMs: number;
   state: PlayerState;
 }
 
@@ -36,6 +37,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   /** True while rising from a jump the player can still cut short. */
   private jumpCuttable = false;
   private _state: PlayerState = "idle";
+  /** Controls are locked while > 0 (knockback after a hit). */
+  private stunMs = 0;
+  /** Can't take damage while > 0. */
+  private invincibleMs = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -62,6 +67,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this._state;
   }
 
+  get invincible(): boolean {
+    return this.invincibleMs > 0;
+  }
+
   get grounded(): boolean {
     return this.body.blocked.down || this.body.touching.down;
   }
@@ -77,6 +86,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.coyoteMs = PHYSICS.COYOTE_TIME_MS;
     } else {
       this.coyoteMs = Math.max(0, this.coyoteMs - dtMs);
+    }
+
+    this.invincibleMs = Math.max(0, this.invincibleMs - dtMs);
+    this.updateBlink();
+
+    if (this.stunMs > 0) {
+      // Knocked back: no control, but keep falling and drop any jump input.
+      this.stunMs = Math.max(0, this.stunMs - dtMs);
+      this.controls.consumeJumpPress();
+      this.bufferMs = 0;
+      this.updateState(grounded);
+      return;
     }
 
     if (this.controls.consumeJumpPress()) {
@@ -122,13 +143,34 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.updateState(grounded);
   }
 
-  /** Put the player at a spawn point with no velocity or pending input. */
-  respawn(x: number, y: number): void {
+  /**
+   * Take a hit from a hazard at `sourceX`: knockback away from it, a short
+   * stun, then invincibility frames. Returns false if currently invincible.
+   */
+  hurt(sourceX: number): boolean {
+    if (this.invincible) return false;
+    const away = this.x < sourceX ? -1 : 1;
+    this.body.setVelocity(away * HEALTH.KNOCKBACK_VX, HEALTH.KNOCKBACK_VY);
+    this.stunMs = HEALTH.HURT_STUN_MS;
+    this.invincibleMs = HEALTH.INVINCIBLE_MS;
+    this.jumpCuttable = false;
+    this.updateState(false);
+    return true;
+  }
+
+  /**
+   * Put the player at a spawn point with no velocity or pending input.
+   * `invincible` gives fresh invincibility frames (after losing a life).
+   */
+  respawn(x: number, y: number, invincible = false): void {
     this.body.reset(x, y);
     this.coyoteMs = 0;
     this.bufferMs = 0;
+    this.stunMs = 0;
+    this.invincibleMs = invincible ? HEALTH.INVINCIBLE_MS : 0;
     this.jumpCuttable = false;
     this.controls.consumeJumpPress();
+    this.updateBlink();
     this.updateState(false);
   }
 
@@ -139,15 +181,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       grounded: this.grounded,
       coyoteMs: this.coyoteMs,
       bufferMs: this.bufferMs,
+      invincibleMs: this.invincibleMs,
       state: this._state,
     };
   }
 
   private updateState(grounded: boolean): void {
-    // "hurt" is set by the damage system (phase 3).
     let next: PlayerState;
     const vy = this.body.velocity.y;
-    if (!grounded) {
+    if (this.stunMs > 0) {
+      next = "hurt";
+    } else if (!grounded) {
       next = vy < 0 ? "jump" : "fall";
     } else if (Math.abs(this.body.velocity.x) > PLAYER.IDLE_THRESHOLD) {
       next = "run";
@@ -158,6 +202,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this._state = next;
       this.applyStateVisuals();
     }
+  }
+
+  /** Blink while invincible (GF-4). Driven by physics time, not frame rate. */
+  private updateBlink(): void {
+    const off =
+      this.invincibleMs > 0 &&
+      Math.floor(this.invincibleMs / HEALTH.BLINK_MS) % 2 === 1;
+    this.setAlpha(off ? 0.25 : 1);
   }
 
   /** Placeholder visuals: one color per animation state (real art in phase 5). */

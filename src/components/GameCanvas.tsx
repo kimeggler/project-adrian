@@ -1,7 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import type * as Phaser from "phaser";
+import { GameEvent } from "@/game/events";
 
 /**
  * Mounts the Phaser game and destroys it on unmount.
@@ -9,6 +11,7 @@ import type * as Phaser from "phaser";
  */
 export default function GameCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const container = containerRef.current;
@@ -24,6 +27,7 @@ export default function GameCanvas() {
       if (cancelled) return;
       game = createGame(container);
       const g = game;
+      g.events.once(GameEvent.QUIT_TO_MENU, () => router.push("/"));
       if (process.env.NODE_ENV === "development") {
         // Handle for debugging in the browser console (dev builds only).
         (window as unknown as { __game?: Phaser.Game }).__game = g;
@@ -43,7 +47,7 @@ export default function GameCanvas() {
       if (onWindowResize) window.removeEventListener("resize", onWindowResize);
       game?.destroy(true);
     };
-  }, []);
+  }, [router]);
 
   return (
     <div

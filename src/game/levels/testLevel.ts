@@ -1,21 +1,15 @@
 import { TILE, WORLD } from "../config";
 import { TileId, type LevelData } from "../tiles";
+import type { Level, Point } from "./level";
 
-export interface Level {
-  data: LevelData;
-  widthTiles: number;
-  heightTiles: number;
-  /** Spawn position in px (bottom-center of the player). */
-  spawn: { x: number; y: number };
-  /** Level-end flag position in px (bottom-center of the pole). */
-  flag: { x: number; y: number };
-}
+export type { Level } from "./level";
 
 /**
  * Handmade level for tuning the physics (phase 1).
  *
  * Each section tests one thing: step-ups of 1–3 tiles, drops, gaps of 2–4
  * tiles, a low ceiling for head bumps, a floating platform and a pillar.
+ * Phase 3 adds spikes and a checkpoint in the middle.
  */
 export function buildTestLevel(): Level {
   const H = WORLD.LEVEL_HEIGHT_TILES;
@@ -65,12 +59,19 @@ export function buildTestLevel(): Level {
   }
 
   const flagCol = W - 1 - WORLD.FLAG_TILES_FROM_END;
+  /** Bottom-center of a tile column, standing on the ground. */
+  const onGround = (col: number): Point => ({
+    x: col * TILE + TILE / 2,
+    y: (H - ground[col]) * TILE,
+  });
 
   return {
     data,
     widthTiles: W,
     heightTiles: H,
     spawn: { x: 3 * TILE, y: (H - ground[3]) * TILE },
-    flag: { x: flagCol * TILE + TILE / 2, y: (H - ground[flagCol]) * TILE },
+    flag: onGround(flagCol),
+    spikes: [39, 40, 60, 83].map(onGround),
+    checkpoints: [onGround(49)],
   };
 }

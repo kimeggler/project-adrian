@@ -2,6 +2,8 @@
 export interface LevelStartData {
   /** 1-based level number. */
   level: number;
+  /** Lives at the start of the level. Defaults to HEALTH.START_LIVES. */
+  lives?: number;
 }
 
 /** Stats shown on the level-complete screen. */
@@ -12,4 +14,12 @@ export interface LevelResult {
   /** Coins collected. Coins and score arrive with phase 4. */
   coins: number;
   score: number;
+}
+
+/** What the HUD shows. */
+export interface HudState {
+  level: number;
+  hearts: number;
+  maxHearts: number;
+  lives: number;
 }
