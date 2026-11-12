@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { UI } from "../config";
+import { GAMEPAD, UI } from "../config";
 import { playSfx, SfxKey } from "../systems/Audio";
 import { onKeyPress } from "../utils/keys";
 import { textStyle } from "./font";
@@ -7,6 +7,8 @@ import { textStyle } from "./font";
 export interface MenuItem {
   label: string;
   action: () => void;
+  /** Keep the menu usable afterwards (e.g. "Settings" opens a sub-screen). */
+  keepOpen?: boolean;
 }
 
 /** Button boxes are ~20 px tall with the pixel font; keep a small gap. */
@@ -14,8 +16,10 @@ const ROW_HEIGHT = 22;
 
 /**
  * Vertical button list for in-game screens.
- * Keyboard: ↑/↓ or W/S to move, Enter or Space to choose. Mouse: hover + click.
- * Only the first choice counts, so a double press can't trigger two actions.
+ * Keyboard: ↑/↓ or W/S to move, Enter or Space to choose. Mouse/touch: hover
+ * and click/tap. Gamepad: D-pad ↑/↓, A to choose.
+ * Only the first choice counts (unless the item has `keepOpen`), so a double
+ * press can't trigger two actions.
  */
 export class Menu {
   private readonly buttons: Phaser.GameObjects.Text[] = [];
@@ -54,6 +58,14 @@ export class Menu {
       onKeyPress(kb, "S", move(1));
       onKeyPress(kb, "ENTER", () => this.choose(this.selected));
       onKeyPress(kb, "SPACE", () => this.choose(this.selected));
+      scene.input.gamepad?.on(
+        Phaser.Input.Gamepad.Events.BUTTON_DOWN,
+        (_pad: Phaser.Input.Gamepad.Gamepad, button: Phaser.Input.Gamepad.Button) => {
+          if (button.index === GAMEPAD.DPAD_UP) this.select(this.selected - 1);
+          else if (button.index === GAMEPAD.DPAD_DOWN) this.select(this.selected + 1);
+          else if (button.index === GAMEPAD.JUMP) this.choose(this.selected);
+        },
+      );
     });
   }
 
@@ -68,9 +80,10 @@ export class Menu {
 
   private choose(index: number): void {
     if (this.chosen) return;
-    this.chosen = true;
+    const item = this.items[index];
+    if (!item.keepOpen) this.chosen = true;
     playSfx(this.scene, SfxKey.MENU_SELECT);
-    this.items[index].action();
+    item.action();
   }
 
   private render(): void {

@@ -33,6 +33,30 @@ body {
   image-rendering: crisp-edges;
 }
 
+/* Game page: no scrolling, zooming or text selection while playing on touch. */
+.play-page {
+  position: relative;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+.rotate-hint {
+  display: none;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .rotate-hint {
+    display: block;
+    position: absolute;
+    inset: auto 0 1.5rem 0;
+    text-align: center;
+    font-size: 10px;
+    color: var(--steel-light);
+    pointer-events: none;
+  }
+}
+
 /* --- Landing page --------------------------------------------------------- */
 
 .landing {
@@ -108,6 +132,31 @@ body {
   background: var(--steel-light);
   border: 2px solid var(--ink);
   box-shadow: inset -2px -2px 0 var(--steel);
+}
+
+/* Settings controls */
+.pixel-range {
+  width: 100%;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+.pixel-switch {
+  appearance: none;
+  width: 2.5rem;
+  height: 1.25rem;
+  border: 2px solid var(--ink);
+  background: var(--steel);
+  box-shadow: inset 1.25rem 0 0 var(--steel-light);
+  cursor: pointer;
+}
+.pixel-switch:checked {
+  background: var(--grass);
+  box-shadow: inset -1.25rem 0 0 var(--steel-light);
+}
+.pixel-switch:focus-visible,
+.pixel-range:focus-visible {
+  outline: 2px dashed #ffffff;
+  outline-offset: 3px;
 }
 
 /* Steps through sprite frames laid out side by side (see PixelSprite). */

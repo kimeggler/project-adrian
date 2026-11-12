@@ -6,6 +6,7 @@ import {
   FLAG,
   GAME_HEIGHT,
   GAME_WIDTH,
+  GAMEPAD,
   HEALTH,
   JUICE,
   SPIKES,
@@ -21,6 +22,7 @@ import { buildTestLevel } from "../levels/testLevel";
 import { Health, type DamageOutcome } from "../systems/Health";
 import { playSfx, SfxKey } from "../systems/Audio";
 import { PlayerInput } from "../systems/Input";
+import { getSettings, recordProgress } from "../systems/Save";
 import { coinPoints, timeBonus } from "../systems/Score";
 import { AnimKey, TextureKey } from "../textures";
 import { SOLID_TILES } from "../tiles";
@@ -68,6 +70,7 @@ export class GameScene extends Phaser.Scene {
     this.level = this.testLevel
       ? buildTestLevel()
       : generateLevel(this.seed, this.levelNumber).level;
+    if (!this.testLevel) recordProgress({ level: this.levelNumber });
     this.game.events.emit(GameEvent.LEVEL_STARTED, {
       seed: this.seed,
       level: this.levelNumber,
@@ -141,6 +144,12 @@ export class GameScene extends Phaser.Scene {
     const kb = this.input.keyboard;
     onKeyPress(kb, "ESC", () => this.pauseGame(), pauseToggleEvents);
     onKeyPress(kb, "P", () => this.pauseGame(), pauseToggleEvents);
+    this.input.gamepad?.on(
+      Phaser.Input.Gamepad.Events.BUTTON_DOWN,
+      (_pad: Phaser.Input.Gamepad.Gamepad, button: Phaser.Input.Gamepad.Button) => {
+        if (button.index === GAMEPAD.START) this.pauseGame();
+      },
+    );
     // Keys released while paused never reach this scene; clear them on resume.
     this.events.on(Phaser.Scenes.Events.RESUME, () => kb?.resetKeys());
 
@@ -152,6 +161,7 @@ export class GameScene extends Phaser.Scene {
       this.scene.stop(SceneKey.UI);
       this.scene.stop(SceneKey.LEVEL_COMPLETE);
       this.scene.stop(SceneKey.PAUSE);
+      this.scene.stop(SceneKey.SETTINGS);
       this.scene.stop(SceneKey.GAME_OVER);
     });
   }
@@ -238,6 +248,11 @@ export class GameScene extends Phaser.Scene {
     this.scene.restart(data);
   }
 
+  /** Pause from the touch pause button. */
+  requestPause(): void {
+    this.pauseGame();
+  }
+
   private pauseGame(): void {
     if (this.phase !== "playing") return;
     this.scene.pause();
@@ -287,7 +302,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private shake(): void {
-    if (!JUICE.SCREEN_SHAKE) return;
+    if (!getSettings().screenShake) return;
     this.cameras.main.shake(JUICE.SHAKE_MS, JUICE.SHAKE_INTENSITY);
   }
 
@@ -323,6 +338,7 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(HEALTH.RESPAWN_DELAY_MS, () => {
       if (outcome === "gameOver") {
         this.phase = "gameOver";
+        if (!this.testLevel) recordProgress({ score: this.currentScore });
         this.scene.launch(SceneKey.GAME_OVER);
         return;
       }
@@ -351,6 +367,7 @@ export class GameScene extends Phaser.Scene {
       timeBonus: bonus,
       score: this.currentScore + bonus,
     };
+    if (!this.testLevel) recordProgress({ score: result.score });
     this.scene.launch(SceneKey.LEVEL_COMPLETE, result);
   }
 }

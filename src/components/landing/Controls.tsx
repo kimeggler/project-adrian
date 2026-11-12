@@ -26,6 +26,10 @@ export default function Controls() {
         ))}
       </dl>
       <p className="mt-4 text-center text-[8px] leading-relaxed text-[#cbdbfc]">
+        Gamepad: D-pad or stick to move, A to jump, Start to pause. On phones and tablets,
+        on-screen buttons appear.
+      </p>
+      <p className="mt-3 text-center text-[8px] leading-relaxed text-[#cbdbfc]">
         Hold jump to jump higher. Collect coins, dodge spikes, reach the flag!
       </p>
     </section>

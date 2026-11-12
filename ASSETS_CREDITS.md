@@ -9,6 +9,7 @@ No third-party or copyrighted game assets (Minecraft, Nintendo, etc.) may be use
 |---|---|---|
 | Knight sprites (idle, run, jump, fall, hurt) | Hand-drawn pixel data in `src/game/art/sprites.ts` | Original work, part of this project |
 | Coins, spikes, flag, checkpoints, hearts, dust | Hand-drawn pixel data in `src/game/art/sprites.ts` | Original work, part of this project |
+| Touch button icons (left, right, jump, pause) | Hand-drawn pixel data in `src/game/art/sprites.ts` | Original work, part of this project |
 | Tiles (grass, dirt, stone block, castle wall) | Drawn with code in `src/game/art/tiles.ts` | Original work, part of this project |
 | Parallax background (sky, clouds, mountains, hills) | Drawn with code in `src/game/art/backgrounds.ts` | Original work, part of this project |
 

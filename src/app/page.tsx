@@ -1,12 +1,14 @@
 import Controls from "@/components/landing/Controls";
 import PixelSprite from "@/components/landing/PixelSprite";
+import Records from "@/components/landing/Records";
+import SettingsPanel from "@/components/landing/SettingsPanel";
 import StartButton from "@/components/landing/StartButton";
 import { COIN_FRAMES, KNIGHT_FRAMES } from "@/game/art/sprites";
 
 /**
  * Retro landing page (LP-1). Built from independent sections so more can be
- * added later (LP-2): settings and best score (phase 6), character select
- * and daily challenge (P2) — as new sections here or as their own routes.
+ * added (LP-2): records and settings are sections; character select and
+ * daily challenge (P2) can follow as new sections here or as their own routes.
  */
 export default function Home() {
   return (
@@ -26,9 +28,11 @@ export default function Home() {
           A tiny knight. A big, random world. Every run is new.
         </p>
         <StartButton />
+        <Records />
       </section>
 
       <Controls />
+      <SettingsPanel />
 
       <footer className="text-center text-[8px] leading-relaxed text-[#222034]">
         All art and sounds are original. Font: Press Start 2P (SIL OFL).

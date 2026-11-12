@@ -231,6 +231,34 @@ export const AUDIO = {
   MUTED: false,
 } as const;
 
+// ---------------------------------------------------------------------------
+// Touch controls (PL-7) and gamepad (PL-8)
+// ---------------------------------------------------------------------------
+
+export const TOUCH = {
+  /** Move and jump buttons (px, game resolution). */
+  BUTTON_SIZE: 22,
+  PAUSE_SIZE: 14,
+  MARGIN: 6,
+  GAP: 4,
+  /** Extra invisible area around each button so it's easy to hit (px). */
+  HIT_PADDING: 6,
+  ALPHA: 0.5,
+  PRESSED_ALPHA: 0.9,
+} as const;
+
+export const GAMEPAD = {
+  /** Standard gamepad mapping button indices. */
+  JUMP: 0, // A / Cross
+  BACK: 1, // B / Circle
+  START: 9,
+  DPAD_UP: 12,
+  DPAD_DOWN: 13,
+  DPAD_LEFT: 14,
+  DPAD_RIGHT: 15,
+  STICK_DEADZONE: 0.35,
+} as const;
+
 export const SPIKES = {
   /** Hitbox (px), bottom-centered in the 16×16 tile. Smaller than the art, to be fair. */
   HITBOX_WIDTH: 12,

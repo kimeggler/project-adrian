@@ -190,3 +190,39 @@ export const HEART_EMPTY: Sprite = [".OO.OO.", "O..O..O", "O.....O", ".O...O.", 
 
 /** Landing dust puff, 3×3. */
 export const DUST: Sprite = [".W.", "WhW", ".W."];
+
+// ---------------------------------------------------------------------------
+// Touch button icons, 8×8 (drawn on a framed button in textures.ts)
+// ---------------------------------------------------------------------------
+
+export const ICON_LEFT: Sprite = [
+  "...W....",
+  "..WW....",
+  ".WWWWWW.",
+  "WWWWWWW.",
+  ".WWWWWW.",
+  "..WW....",
+  "...W....",
+  "........",
+];
+export const ICON_RIGHT: Sprite = ICON_LEFT.map((row) => [...row].reverse().join(""));
+export const ICON_JUMP: Sprite = [
+  "...WW...",
+  "..WWWW..",
+  ".WWWWWW.",
+  "WWWWWWWW",
+  "..WWWW..",
+  "..WWWW..",
+  "..WWWW..",
+  "........",
+];
+export const ICON_PAUSE: Sprite = [
+  "........",
+  ".WW..WW.",
+  ".WW..WW.",
+  ".WW..WW.",
+  ".WW..WW.",
+  ".WW..WW.",
+  ".WW..WW.",
+  "........",
+];

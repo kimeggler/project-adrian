@@ -7,6 +7,10 @@ import {
   FLAG,
   HEART_EMPTY,
   HEART_FULL,
+  ICON_JUMP,
+  ICON_LEFT,
+  ICON_PAUSE,
+  ICON_RIGHT,
   KNIGHT_FRAMES,
   KNIGHT_SIZE,
   PALETTE,
@@ -23,6 +27,10 @@ const sprites: Record<string, { sprite: Sprite; w: number; h: number }> = {
   heartFull: { sprite: HEART_FULL, w: 7, h: 6 },
   heartEmpty: { sprite: HEART_EMPTY, w: 7, h: 6 },
   dust: { sprite: DUST, w: 3, h: 3 },
+  iconLeft: { sprite: ICON_LEFT, w: 8, h: 8 },
+  iconRight: { sprite: ICON_RIGHT, w: 8, h: 8 },
+  iconJump: { sprite: ICON_JUMP, w: 8, h: 8 },
+  iconPause: { sprite: ICON_PAUSE, w: 8, h: 8 },
 };
 for (const [anim, frames] of Object.entries(KNIGHT_FRAMES)) {
   frames.forEach((sprite, i) => {

@@ -9,13 +9,17 @@ import {
   FLAG,
   HEART_EMPTY,
   HEART_FULL,
+  ICON_JUMP,
+  ICON_LEFT,
+  ICON_PAUSE,
+  ICON_RIGHT,
   KNIGHT_FRAMES,
   KNIGHT_SIZE,
   SPIKES,
   type Sprite,
 } from "./art/sprites";
 import { drawBlock, drawGround, drawGroundTop, drawWall } from "./art/tiles";
-import { COIN, GAME_HEIGHT, TILE } from "./config";
+import { COIN, GAME_HEIGHT, TILE, TOUCH } from "./config";
 import { TileId, TILESET_SIZE } from "./tiles";
 
 export const TextureKey = {
@@ -33,6 +37,10 @@ export const TextureKey = {
   BG_CLOUDS: "bg-clouds",
   BG_MOUNTAINS: "bg-mountains",
   BG_HILLS: "bg-hills",
+  BTN_LEFT: "btn-left",
+  BTN_RIGHT: "btn-right",
+  BTN_JUMP: "btn-jump",
+  BTN_PAUSE: "btn-pause",
 } as const;
 
 export const AnimKey = {
@@ -67,6 +75,10 @@ export function createTextures(scene: Phaser.Scene): void {
   createLayer(scene, TextureKey.BG_CLOUDS, drawClouds);
   createLayer(scene, TextureKey.BG_MOUNTAINS, drawMountains);
   createLayer(scene, TextureKey.BG_HILLS, drawHills);
+  createButton(scene, TextureKey.BTN_LEFT, ICON_LEFT, TOUCH.BUTTON_SIZE);
+  createButton(scene, TextureKey.BTN_RIGHT, ICON_RIGHT, TOUCH.BUTTON_SIZE);
+  createButton(scene, TextureKey.BTN_JUMP, ICON_JUMP, TOUCH.BUTTON_SIZE);
+  createButton(scene, TextureKey.BTN_PAUSE, ICON_PAUSE, TOUCH.PAUSE_SIZE);
   createAnimations(scene);
 }
 
@@ -87,6 +99,22 @@ function createSheet(scene: Phaser.Scene, key: string, frames: readonly Sprite[]
     paintSprite(ctx, frame, i * size, 0);
     tex.add(i, 0, i * size, 0, size, size);
   });
+  tex.refresh();
+}
+
+/** Touch button: dark rounded square with a light frame and a centered icon. */
+function createButton(scene: Phaser.Scene, key: string, icon: Sprite, size: number): void {
+  const tex = scene.textures.createCanvas(key, size, size);
+  if (!tex) return;
+  const ctx = tex.getContext();
+  ctx.fillStyle = "#cbdbfc";
+  ctx.fillRect(1, 0, size - 2, size);
+  ctx.fillRect(0, 1, size, size - 2);
+  ctx.fillStyle = "#222034";
+  ctx.fillRect(2, 1, size - 4, size - 2);
+  ctx.fillRect(1, 2, size - 2, size - 4);
+  const { width, height } = spriteSize(icon);
+  paintSprite(ctx, icon, Math.floor((size - width) / 2), Math.floor((size - height) / 2));
   tex.refresh();
 }
 

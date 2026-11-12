@@ -6,6 +6,7 @@ import { GameOverScene } from "./scenes/GameOverScene";
 import { GameScene } from "./scenes/GameScene";
 import { LevelCompleteScene } from "./scenes/LevelCompleteScene";
 import { PauseScene } from "./scenes/PauseScene";
+import { SettingsScene } from "./scenes/SettingsScene";
 import { UIScene } from "./scenes/UIScene";
 import { START_DATA_KEY } from "./events";
 import type { LevelStartData } from "./types";
@@ -24,6 +25,10 @@ export function createGame(parent: HTMLElement, start: LevelStartData): Phaser.G
     banner: false,
     // Share the app's AudioContext, unlocked by the "Start game" click (AU-2).
     audio: { context: getAudioContext() },
+    input: {
+      gamepad: true, // PL-8
+      activePointers: 3, // multi-touch: move + jump at the same time (PL-7)
+    },
     render: {
       pixelArt: true,
       roundPixels: true,
@@ -47,6 +52,7 @@ export function createGame(parent: HTMLElement, start: LevelStartData): Phaser.G
       GameScene,
       UIScene,
       PauseScene,
+      SettingsScene,
       GameOverScene,
       LevelCompleteScene,
     ],

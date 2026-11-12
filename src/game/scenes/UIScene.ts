@@ -1,6 +1,8 @@
 import * as Phaser from "phaser";
 import { GAME_WIDTH } from "../config";
+import { getVirtualPad } from "../systems/Input";
 import { TextureKey } from "../textures";
+import { TouchControls } from "../ui/TouchControls";
 import { textStyle } from "../ui/font";
 import type { HudState } from "../types";
 import type { GameScene } from "./GameScene";
@@ -14,7 +16,7 @@ const hudStyle = () => textStyle({ stroke: "#000000", strokeThickness: 2 });
 /**
  * HUD overlay on top of GameScene with its own fixed camera.
  * Hearts, lives, coins, score and level number (GP-4).
- * Also hosts the F1 debug overlay.
+ * Also hosts the touch controls (PL-7) and the F1 debug overlay.
  */
 export class UIScene extends Phaser.Scene {
   private hearts: Phaser.GameObjects.Image[] = [];
@@ -46,6 +48,15 @@ export class UIScene extends Phaser.Scene {
       .setVisible(this.debugVisible)
       .setDepth(1000);
     if (this.debugVisible) this.setPhysicsDebug(true);
+
+    const game = this.scene.get(SceneKey.GAME) as GameScene;
+    new TouchControls(
+      this,
+      getVirtualPad(this),
+      () => game.requestPause(),
+      // Make room for the pause button in the top-right corner.
+      () => this.levelText.setX(GAME_WIDTH - 20),
+    );
 
     const f1 = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.F1, true);
     f1?.on(Phaser.Input.Keyboard.Events.DOWN, () => this.toggleDebug());

@@ -7,8 +7,11 @@ export const metadata: Metadata = {
 
 export default function PlayPage() {
   return (
-    <main className="h-dvh w-full bg-black">
+    <main className="play-page h-dvh w-full bg-black">
       <GameLoader />
+      <p className="rotate-hint" aria-hidden>
+        Turn your phone sideways for a bigger view
+      </p>
     </main>
   );
 }
