@@ -404,3 +404,54 @@ export const TOTEM_FRAMES = {
 
 /** The totem's rock, 6×6. */
 export const ROCK: Sprite = [".OOOO.", "OhHHsO", "OHhHsO", "OHHssO", "OsssvO", ".OOOO."];
+
+// ---------------------------------------------------------------------------
+// Power-up items, 8×8 (CB-6)
+// ---------------------------------------------------------------------------
+
+export const ITEM_BOOTS: Sprite = [
+  "..OOOO..",
+  "..OYYO..",
+  "WWOKKO..",
+  ".WOKKO..",
+  "..OKKOO.",
+  ".OKKKKKO",
+  ".OKKKKKO",
+  ".OOOOOOO",
+];
+
+export const ITEM_SHIELD: Sprite = [
+  ".OOOOOO.",
+  "OBBYYBBO",
+  "OBBYYBBO",
+  "OYYYYYYO",
+  "OBBYYBBO",
+  ".OBYYBO.",
+  "..OBBO..",
+  "...OO...",
+];
+
+export const ITEM_AXE: Sprite = [
+  "...OOOO.",
+  "..OLOhHO",
+  "..OLOHHO",
+  "..OLOOO.",
+  "..OLO...",
+  "..OLO...",
+  "..OLO...",
+  "...O....",
+];
+
+/** Rotate a square sprite 90° clockwise. */
+function rotate(sprite: Sprite): Sprite {
+  const n = sprite.length;
+  return sprite.map((_, r) => Array.from({ length: n }, (_, c) => sprite[n - 1 - c][r]).join(""));
+}
+
+/** Thrown axe: four quarter turns (rotating whole pixels keeps it crisp). */
+export const AXE_SPIN_FRAMES: readonly Sprite[] = [
+  ITEM_AXE,
+  rotate(ITEM_AXE),
+  rotate(rotate(ITEM_AXE)),
+  rotate(rotate(rotate(ITEM_AXE))),
+];

@@ -16,7 +16,11 @@ import {
   KNIGHT_FRAMES,
   KNIGHT_SIZE,
   PALETTE,
+  AXE_SPIN_FRAMES,
   HOPPER_FRAMES,
+  ITEM_AXE,
+  ITEM_BOOTS,
+  ITEM_SHIELD,
   ROCK,
   SLIME_FRAMES,
   TOTEM_FRAMES,
@@ -40,6 +44,9 @@ const sprites: Record<string, { sprite: Sprite; w: number; h: number }> = {
   iconSword: { sprite: ICON_SWORD, w: 8, h: 8 },
   slash: { sprite: SLASH, w: 16, h: 9 },
   rock: { sprite: ROCK, w: PROJECTILE.SIZE, h: PROJECTILE.SIZE },
+  itemBoots: { sprite: ITEM_BOOTS, w: 8, h: 8 },
+  itemShield: { sprite: ITEM_SHIELD, w: 8, h: 8 },
+  itemAxe: { sprite: ITEM_AXE, w: 8, h: 8 },
 };
 for (const [anim, frames] of Object.entries(KNIGHT_FRAMES)) {
   frames.forEach((sprite, i) => {
@@ -58,6 +65,9 @@ for (const [anim, frames] of Object.entries(SLIME_FRAMES)) {
     sprites[`slime.${anim}.${i}`] = { sprite, w: ENEMY.SIZE, h: ENEMY.SIZE };
   });
 }
+AXE_SPIN_FRAMES.forEach((sprite, i) => {
+  sprites[`axeSpin.${i}`] = { sprite, w: 8, h: 8 };
+});
 COIN_FRAMES.forEach((sprite, i) => {
   sprites[`coin.${i}`] = { sprite, w: COIN.SIZE, h: COIN.SIZE };
 });
@@ -74,6 +84,11 @@ describe("pixel art", () => {
       });
     });
   }
+
+  it("rotates the thrown axe through four different quarter turns", () => {
+    expect(new Set(AXE_SPIN_FRAMES.map((f) => f.join("|"))).size).toBe(4);
+    expect(AXE_SPIN_FRAMES[0]).toEqual(ITEM_AXE);
+  });
 
   it("knight frames differ between animation steps", () => {
     expect(KNIGHT_FRAMES.run[0]).not.toEqual(KNIGHT_FRAMES.run[1]);

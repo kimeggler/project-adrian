@@ -9,6 +9,8 @@ import {
   difficultyFor,
   ENEMY,
   LEVELGEN,
+  POWERUP,
+  type PowerUpKind,
   maxGapTiles,
   maxStepTiles,
   TILE,
@@ -16,6 +18,7 @@ import {
   type DifficultyRow,
 } from "../config";
 import type { EnemyKind, EnemySpawn, Level, Point } from "../levels/level";
+import { POWERUP_KINDS } from "../systems/PowerUps";
 import { TileId, type LevelData } from "../tiles";
 import { checkReachability } from "./reachability";
 import { hash32, Rng } from "./rng";
@@ -86,6 +89,8 @@ export function buildLevel(rngSeed: number, difficulty: DifficultyRow): Level {
     new Rng(hash32(rngSeed ^ 0x6b1d5a7e)),
     difficulty,
   );
+  // Power-ups: a fourth stream, so terrain and enemies stay the same (phase 10).
+  level.powerUps = placePowerUps(level, layout, new Rng(hash32(rngSeed ^ 0x70e4a9b3)), difficulty);
   return level;
 }
 
@@ -314,6 +319,43 @@ function buildLayout(rng: Rng, diff: DifficultyRow): Layout {
   return { ground, blocks, spikeCols, coins, checkpointCol };
 }
 
+/**
+ * Power-ups (CB-6): `diff.powerUps` items, spread over the middle of the
+ * level (one per section), floating just above free, flat ground: no spikes,
+ * no coin in the way, not at the checkpoint and not inside an enemy's area.
+ */
+function placePowerUps(level: Level, layout: Layout, rng: Rng, diff: DifficultyRow): Level["powerUps"] {
+  const { ground, spikeCols, checkpointCol } = layout;
+  const spikes = new Set(spikeCols);
+  const coins = new Set(level.coins.map((c) => Math.floor(c.x / TILE)));
+  const inEnemyArea = (c: number) =>
+    level.enemies.some((e) => c * TILE + TILE > e.minX && c * TILE < e.maxX);
+  const free = (c: number) => {
+    const g = ground[c];
+    if (g <= 0 || spikes.has(c) || coins.has(c) || inEnemyArea(c)) return false;
+    if (Math.abs(c - checkpointCol) <= 2) return false;
+    for (let k = 1; k <= LEVELGEN.MIN_HEADROOM; k++) {
+      if (level.data[surfaceRow(g) - k]?.[c] !== TileId.EMPTY) return false;
+    }
+    return true;
+  };
+
+  const from = SAFE + 4;
+  const to = W - 1 - SAFE - 4;
+  const sectionLen = Math.floor((to - from) / Math.max(1, diff.powerUps));
+  const items: Level["powerUps"] = [];
+  for (let i = 0; i < diff.powerUps; i++) {
+    const start = from + i * sectionLen;
+    const candidates: number[] = [];
+    for (let c = start; c < start + sectionLen; c++) if (free(c)) candidates.push(c);
+    if (candidates.length === 0) continue;
+    const col = candidates[rng.int(0, candidates.length - 1)];
+    const kind = rng.weighted<PowerUpKind>(Object.fromEntries(POWERUP_KINDS.map((k) => [k, 1])) as Record<PowerUpKind, number>);
+    items.push({ kind, x: col * TILE + TILE / 2, y: surfaceRow(ground[col]) * TILE - POWERUP.ITEM_HEIGHT });
+  }
+  return items;
+}
+
 function toLevel(layout: Layout): Level {
   const { ground, blocks, spikeCols, coins, checkpointCol } = layout;
 
@@ -363,5 +405,6 @@ function toLevel(layout: Layout): Level {
     checkpoints: [onGround(checkpointCol)],
     coins: coinPoints,
     enemies: [], // placed by placeEnemies()
+    powerUps: [], // placed by placePowerUps()
   };
 }

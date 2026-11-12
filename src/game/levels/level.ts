@@ -1,3 +1,4 @@
+import type { PowerUpKind } from "../config";
 import type { LevelData } from "../tiles";
 
 /** A point in px. For objects standing on the ground: bottom-center. */
@@ -46,4 +47,6 @@ export interface Level {
   coins: Point[];
   /** Enemies (phase 7). */
   enemies: EnemySpawn[];
+  /** Power-up items, by center point (CB-6). */
+  powerUps: (Point & { kind: PowerUpKind })[];
 }

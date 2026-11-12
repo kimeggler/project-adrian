@@ -71,9 +71,15 @@ export function buildTestLevel(): Level {
     heightTiles: H,
     spawn: { x: 3 * TILE, y: (H - ground[3]) * TILE },
     flag: onGround(flagCol),
-    spikes: [39, 40, 60, 83].map(onGround),
+    spikes: [39, 40, 60, 88].map(onGround),
     checkpoints: [onGround(49)],
     coins: [],
+    // One of each power-up on the flat stretch before the flag.
+    powerUps: [
+      { kind: "boots" as const, x: 82 * TILE + TILE / 2, y: (H - 2) * TILE - 10 },
+      { kind: "shield" as const, x: 84 * TILE + TILE / 2, y: (H - 2) * TILE - 10 },
+      { kind: "axe" as const, x: 86 * TILE + TILE / 2, y: (H - 2) * TILE - 10 },
+    ],
     // One walker under the low ceiling: tests stomping with little headroom.
     enemies: [
       {

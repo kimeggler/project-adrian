@@ -3,6 +3,7 @@ import {
   difficultyFor,
   ENEMY,
   LEVELGEN,
+  POWERUP,
   maxGapTiles,
   maxStepTiles,
   TILE,
@@ -189,6 +190,25 @@ describe("level generator", () => {
     expect(later.shooter).toBeGreaterThan(0);
   }, SLOW);
 
+  it("places power-ups on free flat ground, away from enemies (CB-6)", () => {
+    const kinds = new Set<string>();
+    for (const { seed, level } of cases.slice(0, 200)) {
+      const lvl = generateLevel(seed, level).level;
+      const ground = groundHeights(lvl);
+      expect(lvl.powerUps.length).toBeLessThanOrEqual(difficultyFor(level).powerUps);
+      for (const p of lvl.powerUps) {
+        kinds.add(p.kind);
+        const c = Math.floor(p.x / TILE);
+        expect(ground[c]).toBeGreaterThan(0);
+        // Floats just above the ground, inside free space.
+        expect(p.y).toBe((lvl.heightTiles - ground[c]) * TILE - POWERUP.ITEM_HEIGHT);
+        expect(lvl.spikes.some((s) => Math.floor(s.x / TILE) === c)).toBe(false);
+        expect(lvl.enemies.some((e) => p.x > e.minX && p.x < e.maxX)).toBe(false);
+      }
+    }
+    expect(kinds).toEqual(new Set(["boots", "shield", "axe"]));
+  }, SLOW);
+
   it("places coins in free space only", () => {
     for (const { seed, level } of cases.slice(0, 100)) {
       const lvl = generateLevel(seed, level).level;
@@ -227,6 +247,7 @@ describe("reachability check", () => {
       checkpoints: [],
       coins: [],
       enemies: [],
+      powerUps: [],
     };
   }
 

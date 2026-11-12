@@ -161,6 +161,8 @@ export interface EnemyDifficulty {
   /** Shooter: time between shots (ms), and projectile speed (px/s). */
   fireIntervalMs: number;
   projectileSpeed: number;
+  /** Power-up items placed in the level (CB-6). */
+  powerUps: number;
 }
 
 export type DifficultyRow = TerrainDifficulty & EnemyDifficulty;
@@ -176,16 +178,16 @@ const TERRAIN_BY_LEVEL: readonly TerrainDifficulty[] = [
 
 // prettier-ignore
 const ENEMIES_BY_LEVEL: readonly EnemyDifficulty[] = [
-  { enemyChance: 0.15, walkerWeight: 1, jumperWeight: 0, shooterWeight: 0, walkerSpeed: 24, hpBonus: 0, damage: 1, fireIntervalMs: 2600, projectileSpeed: 70 },
-  { enemyChance: 0.25, walkerWeight: 4, jumperWeight: 1, shooterWeight: 0, walkerSpeed: 26, hpBonus: 0, damage: 1, fireIntervalMs: 2600, projectileSpeed: 70 },
-  { enemyChance: 0.35, walkerWeight: 4, jumperWeight: 1, shooterWeight: 1, walkerSpeed: 28, hpBonus: 0, damage: 1, fireIntervalMs: 2400, projectileSpeed: 75 },
-  { enemyChance: 0.4, walkerWeight: 4, jumperWeight: 2, shooterWeight: 1, walkerSpeed: 30, hpBonus: 0, damage: 1, fireIntervalMs: 2200, projectileSpeed: 80 },
-  { enemyChance: 0.45, walkerWeight: 4, jumperWeight: 2, shooterWeight: 2, walkerSpeed: 33, hpBonus: 1, damage: 1, fireIntervalMs: 2000, projectileSpeed: 85 },
-  { enemyChance: 0.5, walkerWeight: 3, jumperWeight: 2, shooterWeight: 2, walkerSpeed: 36, hpBonus: 1, damage: 1, fireIntervalMs: 1800, projectileSpeed: 90 },
-  { enemyChance: 0.52, walkerWeight: 3, jumperWeight: 3, shooterWeight: 2, walkerSpeed: 38, hpBonus: 1, damage: 2, fireIntervalMs: 1700, projectileSpeed: 95 },
-  { enemyChance: 0.55, walkerWeight: 3, jumperWeight: 3, shooterWeight: 3, walkerSpeed: 40, hpBonus: 2, damage: 2, fireIntervalMs: 1600, projectileSpeed: 100 },
-  { enemyChance: 0.57, walkerWeight: 3, jumperWeight: 3, shooterWeight: 3, walkerSpeed: 42, hpBonus: 2, damage: 2, fireIntervalMs: 1500, projectileSpeed: 105 },
-  { enemyChance: 0.6, walkerWeight: 3, jumperWeight: 3, shooterWeight: 3, walkerSpeed: 45, hpBonus: 3, damage: 2, fireIntervalMs: 1400, projectileSpeed: 110 },
+  { enemyChance: 0.15, walkerWeight: 1, jumperWeight: 0, shooterWeight: 0, walkerSpeed: 24, hpBonus: 0, damage: 1, fireIntervalMs: 2600, projectileSpeed: 70, powerUps: 1 },
+  { enemyChance: 0.25, walkerWeight: 4, jumperWeight: 1, shooterWeight: 0, walkerSpeed: 26, hpBonus: 0, damage: 1, fireIntervalMs: 2600, projectileSpeed: 70, powerUps: 1 },
+  { enemyChance: 0.35, walkerWeight: 4, jumperWeight: 1, shooterWeight: 1, walkerSpeed: 28, hpBonus: 0, damage: 1, fireIntervalMs: 2400, projectileSpeed: 75, powerUps: 1 },
+  { enemyChance: 0.4, walkerWeight: 4, jumperWeight: 2, shooterWeight: 1, walkerSpeed: 30, hpBonus: 0, damage: 1, fireIntervalMs: 2200, projectileSpeed: 80, powerUps: 1 },
+  { enemyChance: 0.45, walkerWeight: 4, jumperWeight: 2, shooterWeight: 2, walkerSpeed: 33, hpBonus: 1, damage: 1, fireIntervalMs: 2000, projectileSpeed: 85, powerUps: 2 },
+  { enemyChance: 0.5, walkerWeight: 3, jumperWeight: 2, shooterWeight: 2, walkerSpeed: 36, hpBonus: 1, damage: 1, fireIntervalMs: 1800, projectileSpeed: 90, powerUps: 2 },
+  { enemyChance: 0.52, walkerWeight: 3, jumperWeight: 3, shooterWeight: 2, walkerSpeed: 38, hpBonus: 1, damage: 2, fireIntervalMs: 1700, projectileSpeed: 95, powerUps: 2 },
+  { enemyChance: 0.55, walkerWeight: 3, jumperWeight: 3, shooterWeight: 3, walkerSpeed: 40, hpBonus: 2, damage: 2, fireIntervalMs: 1600, projectileSpeed: 100, powerUps: 2 },
+  { enemyChance: 0.57, walkerWeight: 3, jumperWeight: 3, shooterWeight: 3, walkerSpeed: 42, hpBonus: 2, damage: 2, fireIntervalMs: 1500, projectileSpeed: 105, powerUps: 2 },
+  { enemyChance: 0.6, walkerWeight: 3, jumperWeight: 3, shooterWeight: 3, walkerSpeed: 45, hpBonus: 3, damage: 2, fireIntervalMs: 1400, projectileSpeed: 110, powerUps: 2 },
 ];
 
 /** The difficulty table: one merged row per level. */
@@ -416,6 +418,34 @@ export function swordForLevel(level: number): SwordStats & { swordLevel: number 
   });
   return { ...SWORD_UPGRADES[index], swordLevel: index + 1 };
 }
+
+// ---------------------------------------------------------------------------
+// Power-ups and temporary weapons (CB-6) — Phase 10
+// ---------------------------------------------------------------------------
+
+export type PowerUpKind = "boots" | "shield" | "axe";
+
+export const POWERUP = {
+  /** Icon and effect blink during the last part of a power-up (ms). */
+  WARNING_MS: 2000,
+  BLINK_MS: 150,
+  DURATION_MS: { boots: 10000, shield: 8000, axe: 12000 } satisfies Record<PowerUpKind, number>,
+  /** Speed boots: run speed multiplier. */
+  BOOTS_SPEED: 1.4,
+  /** Throwing axe (temporary weapon, replaces the sword while active). */
+  AXE_THROW_VX: 160,
+  AXE_THROW_VY: -200,
+  AXE_COOLDOWN_MS: 400,
+  AXE_DAMAGE: 2,
+  AXE_HITBOX: 8,
+  AXE_SPIN_FPS: 16,
+  /** Items: size, float height above the ground and bobbing (px). */
+  ITEM_SIZE: 8,
+  ITEM_HEIGHT: 10,
+  ITEM_BOB: 2,
+  /** Shield push on enemies that touch the knight (px/s). */
+  SHIELD_KNOCKBACK_VX: 120,
+} as const;
 
 export const SPIKES = {
   /** Hitbox (px), bottom-centered in the 16×16 tile. Smaller than the art, to be fair. */

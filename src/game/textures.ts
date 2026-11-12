@@ -17,7 +17,11 @@ import {
   KNIGHT_FRAMES,
   KNIGHT_SIZE,
   SLASH,
+  AXE_SPIN_FRAMES,
   HOPPER_FRAMES,
+  ITEM_AXE,
+  ITEM_BOOTS,
+  ITEM_SHIELD,
   ROCK,
   SLIME_FRAMES,
   TOTEM_FRAMES,
@@ -25,7 +29,7 @@ import {
   type Sprite,
 } from "./art/sprites";
 import { drawBlock, drawGround, drawGroundTop, drawWall } from "./art/tiles";
-import { COIN, ENEMY, GAME_HEIGHT, TILE, TOUCH } from "./config";
+import { COIN, ENEMY, GAME_HEIGHT, POWERUP, TILE, TOUCH } from "./config";
 import { TileId, TILESET_SIZE } from "./tiles";
 
 export const TextureKey = {
@@ -35,6 +39,11 @@ export const TextureKey = {
   HOPPER: "hopper",
   TOTEM: "totem",
   ROCK: "rock",
+  ITEM_BOOTS: "item-boots",
+  ITEM_SHIELD: "item-shield",
+  ITEM_AXE: "item-axe",
+  AXE_SPIN: "axe-spin",
+  SHIELD_BUBBLE: "shield-bubble",
   FLAG: "flag",
   CHECKPOINT_OFF: "checkpoint-off",
   CHECKPOINT_ON: "checkpoint-on",
@@ -64,6 +73,7 @@ export const AnimKey = {
   KNIGHT_ATTACK: "knight-attack",
   COIN_SPIN: "coin-spin",
   SLIME_WALK: "slime-walk",
+  AXE_SPIN: "axe-spin",
 } as const;
 
 /** Frame index of the squashed slime in the slime sheet. */
@@ -83,6 +93,8 @@ export function createTextures(scene: Phaser.Scene): void {
   createSheet(scene, TextureKey.SLIME, [...SLIME_FRAMES.walk, ...SLIME_FRAMES.squashed], ENEMY.SIZE);
   createSheet(scene, TextureKey.HOPPER, [...HOPPER_FRAMES.crouch, ...HOPPER_FRAMES.air], ENEMY.SIZE);
   createSheet(scene, TextureKey.TOTEM, [...TOTEM_FRAMES.idle, ...TOTEM_FRAMES.charge], ENEMY.SIZE);
+  createSheet(scene, TextureKey.AXE_SPIN, AXE_SPIN_FRAMES, POWERUP.ITEM_SIZE);
+  createShieldBubble(scene);
   for (const [key, sprite] of [
     [TextureKey.FLAG, FLAG],
     [TextureKey.CHECKPOINT_OFF, CHECKPOINT_OFF],
@@ -93,6 +105,9 @@ export function createTextures(scene: Phaser.Scene): void {
     [TextureKey.DUST, DUST],
     [TextureKey.SLASH, SLASH],
     [TextureKey.ROCK, ROCK],
+    [TextureKey.ITEM_BOOTS, ITEM_BOOTS],
+    [TextureKey.ITEM_SHIELD, ITEM_SHIELD],
+    [TextureKey.ITEM_AXE, ITEM_AXE],
   ] as const) {
     createImage(scene, key, sprite);
   }
@@ -125,6 +140,26 @@ function createSheet(scene: Phaser.Scene, key: string, frames: readonly Sprite[]
     paintSprite(ctx, frame, i * size, 0);
     tex.add(i, 0, i * size, 0, size, size);
   });
+  tex.refresh();
+}
+
+/** Shield bubble around the knight: a light ring with a faint fill (22×22). */
+function createShieldBubble(scene: Phaser.Scene): void {
+  const size = 22;
+  const tex = scene.textures.createCanvas(TextureKey.SHIELD_BUBBLE, size, size);
+  if (!tex) return;
+  const ctx = tex.getContext();
+  const c = (size - 1) / 2;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const d = Math.hypot(x - c, y - c);
+      if (d > c + 0.5) continue;
+      if (d >= c - 0.5) ctx.fillStyle = "#cbdbfc";
+      else if (d >= c - 1.5) ctx.fillStyle = "rgba(95, 205, 228, 0.7)";
+      else ctx.fillStyle = "rgba(95, 205, 228, 0.18)";
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
   tex.refresh();
 }
 
@@ -185,6 +220,12 @@ function createAnimations(scene: Phaser.Scene): void {
     key: AnimKey.SLIME_WALK,
     frames: SLIME_FRAMES.walk.map((_, i) => ({ key: TextureKey.SLIME, frame: i })),
     frameRate: ENEMY.WALK_FPS,
+    repeat: -1,
+  });
+  scene.anims.create({
+    key: AnimKey.AXE_SPIN,
+    frames: AXE_SPIN_FRAMES.map((_, i) => ({ key: TextureKey.AXE_SPIN, frame: i })),
+    frameRate: POWERUP.AXE_SPIN_FPS,
     repeat: -1,
   });
   scene.anims.create({

@@ -9,6 +9,8 @@ import {
   GAMEPAD,
   HEALTH,
   JUICE,
+  POWERUP,
+  type PowerUpKind,
   SCORE,
   SPIKES,
   swordForLevel,
@@ -20,6 +22,7 @@ import type { Enemy } from "../entities/Enemy";
 import { Jumper } from "../entities/Jumper";
 import { Projectile } from "../entities/Projectile";
 import { Shooter } from "../entities/Shooter";
+import { ThrownAxe } from "../entities/ThrownAxe";
 import { Walker } from "../entities/Walker";
 import type { EnemySpawn } from "../levels/level";
 import { isStomp, overlaps, type Rect } from "../systems/Combat";
@@ -41,6 +44,18 @@ import { SceneKey } from "./keys";
 
 type Phase = "playing" | "dying" | "complete" | "gameOver";
 
+const POWERUP_TEXTURES: Record<PowerUpKind, string> = {
+  boots: TextureKey.ITEM_BOOTS,
+  shield: TextureKey.ITEM_SHIELD,
+  axe: TextureKey.ITEM_AXE,
+};
+
+const POWERUP_NAMES: Record<PowerUpKind, string> = {
+  boots: "SPEED BOOTS!",
+  shield: "SHIELD!",
+  axe: "THROWING AXE!",
+};
+
 export class GameScene extends Phaser.Scene {
   player!: Player;
   private level!: Level;
@@ -56,6 +71,7 @@ export class GameScene extends Phaser.Scene {
   private stomps = 0;
   private enemies: Enemy[] = [];
   private projectiles!: Phaser.Physics.Arcade.Group;
+  private axes!: Phaser.Physics.Arcade.Group;
   /** Message for the HUD to show once (e.g. a sword upgrade). */
   private toast?: string;
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -149,6 +165,19 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.enemies, layer);
     this.physics.add.overlap(this.player, this.enemies, (_p, e) => this.onEnemyContact(e as Enemy));
 
+    // --- Power-ups (CB-6) ------------------------------------------------------
+    const items = this.physics.add.staticGroup();
+    for (const p of this.level.powerUps) {
+      const item = this.physics.add.staticImage(p.x, p.y, POWERUP_TEXTURES[p.kind]).setData("kind", p.kind);
+      items.add(item);
+      // Gentle bobbing (cosmetic; the hitbox stays put).
+      this.tweens.add({ targets: item, y: p.y - POWERUP.ITEM_BOB, duration: 600, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    }
+    this.physics.add.overlap(this.player, items, (_p, item) => this.onPowerUp(item as Phaser.Physics.Arcade.Image));
+
+    this.axes = this.physics.add.group();
+    this.physics.add.collider(this.axes, layer, (a) => (a as ThrownAxe).destroy());
+
     this.projectiles = this.physics.add.group({ allowGravity: false });
     this.physics.add.collider(this.projectiles, layer, (p) => (p as Projectile).destroy());
     this.physics.add.overlap(this.player, this.projectiles, (_p, p) => this.onProjectileHit(p as Projectile));
@@ -164,6 +193,7 @@ export class GameScene extends Phaser.Scene {
       this.player.step(dt);
       for (const e of this.enemies) e.step(dt, this.player);
       for (const p of this.projectiles.getChildren() as Projectile[]) p.step();
+      this.checkAxeHits();
       this.checkSwordHits();
     };
     world.on(Phaser.Physics.Arcade.Events.WORLD_STEP, onStep);
@@ -324,6 +354,14 @@ export class GameScene extends Phaser.Scene {
     const p = this.player;
     p.on(PlayerEvent.JUMP, () => playSfx(this, SfxKey.JUMP));
     p.on(PlayerEvent.ATTACK, () => playSfx(this, SfxKey.SWORD_SWING));
+    p.on(PlayerEvent.THROW_AXE, (x: number, y: number, facing: 1 | -1) => {
+      const axe = new ThrownAxe(this, x, y, facing);
+      this.axes.add(axe);
+      axe.launch();
+      playSfx(this, SfxKey.AXE_THROW);
+    });
+    p.on(PlayerEvent.POWERUP_END, () => playSfx(this, SfxKey.POWER_DOWN));
+    p.on(PlayerEvent.TRAIL, () => dust.explode(1, p.x + (p.view.flipX ? 4 : -4), p.y - 1));
     p.on(PlayerEvent.LAND, (impact: number) => {
       if (impact < JUICE.MIN_LAND_SPEED) return;
       dust.explode(JUICE.DUST_LAND, p.x, p.y - 1);
@@ -374,6 +412,12 @@ export class GameScene extends Phaser.Scene {
 
   private onProjectileHit(rock: Projectile): void {
     if (this.phase !== "playing" || !rock.active) return;
+    if (this.player.shielded) {
+      // The shield breaks rocks.
+      rock.destroy();
+      playSfx(this, SfxKey.ENEMY_HIT);
+      return;
+    }
     if (!this.player.hurt(rock.x)) return; // invincible: the rock passes through
     rock.destroy();
     const outcome = this.health.damage(rock.damage);
@@ -393,6 +437,47 @@ export class GameScene extends Phaser.Scene {
       playSfx(this, SfxKey.SWORD_UPGRADE);
     }
     if (!this.testLevel) recordProgress({ weaponLevel: sword.swordLevel });
+  }
+
+  private onPowerUp(item: Phaser.Physics.Arcade.Image): void {
+    if (this.phase !== "playing" || !item.active) return;
+    const kind = item.getData("kind") as PowerUpKind;
+    item.destroy();
+    this.player.addPowerUp(kind);
+    playSfx(this, SfxKey.POWER_UP);
+    this.toast = POWERUP_NAMES[kind];
+  }
+
+  /** Thrown axes against enemies and rocks (CB-6). Each axe breaks on its first hit. */
+  private checkAxeHits(): void {
+    const rect = (b: Phaser.Physics.Arcade.Body) => ({ x: b.left, y: b.top, width: b.width, height: b.height });
+    for (const axe of [...(this.axes.getChildren() as ThrownAxe[])]) {
+      if (axe.y > this.level.heightTiles * TILE + WORLD.PIT_MARGIN) {
+        axe.destroy();
+        continue;
+      }
+      const box = rect(axe.body);
+      const rock = (this.projectiles.getChildren() as Projectile[]).find((r) => overlaps(box, rect(r.body)));
+      if (rock) {
+        rock.destroy();
+        axe.destroy();
+        playSfx(this, SfxKey.ENEMY_HIT);
+        continue;
+      }
+      for (const e of [...this.enemies]) {
+        if (!overlaps(box, rect(e.body))) continue;
+        const result = e.swordHit(axe.hitId, POWERUP.AXE_DAMAGE, axe.x);
+        if (!result) continue;
+        axe.destroy();
+        playSfx(this, SfxKey.ENEMY_HIT);
+        if (result === "defeated") {
+          this.enemies = this.enemies.filter((x) => x !== e);
+          this.stomps++;
+          this.dust?.explode(JUICE.DUST_LAND, e.x, e.y - 4);
+        }
+        break;
+      }
+    }
   }
 
   /** The HUD takes this message once and shows it. */
@@ -456,6 +541,10 @@ export class GameScene extends Phaser.Scene {
       this.stomps++;
       this.dust?.explode(JUICE.DUST_LAND, walker.x, walker.y - 1);
       playSfx(this, SfxKey.STOMP);
+      return;
+    }
+    if (this.player.shielded) {
+      walker.knockback(this.player.x, POWERUP.SHIELD_KNOCKBACK_VX);
       return;
     }
     if (!this.player.hurt(walker.x)) return; // invincible (i-frames)

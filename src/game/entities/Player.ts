@@ -1,5 +1,17 @@
 import * as Phaser from "phaser";
-import { ENEMY, HEALTH, JUICE, PHYSICS, PLAYER, SWORD, SWORD_UPGRADES, type SwordStats } from "../config";
+import {
+  ENEMY,
+  HEALTH,
+  JUICE,
+  PHYSICS,
+  PLAYER,
+  POWERUP,
+  SWORD,
+  SWORD_UPGRADES,
+  type PowerUpKind,
+  type SwordStats,
+} from "../config";
+import { PowerUps } from "../systems/PowerUps";
 import { swordHitbox, type Rect } from "../systems/Combat";
 import { AnimKey, TextureKey } from "../textures";
 import type { PlayerInput } from "../systems/Input";
@@ -16,6 +28,12 @@ export const PlayerEvent = {
   HURT: "hurt",
   /** A sword swing started. */
   ATTACK: "attack",
+  /** Throwing axe released (CB-6). Payload: x, y, facing. */
+  THROW_AXE: "throw-axe",
+  /** A power-up ran out. Payload: kind. */
+  POWERUP_END: "powerup-end",
+  /** Running fast with speed boots: a puff of dust trails behind. */
+  TRAIL: "trail",
 } as const;
 
 /** Snapshot for the F1 debug overlay. */
@@ -86,6 +104,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private swingId = 0;
   /** Current sword (CB-5 upgrades). */
   private sword: SwordStats = SWORD_UPGRADES[0];
+  /** Active power-ups and their timers (CB-6). */
+  readonly powerUps = new PowerUps();
+  private axeCooldownMs = 0;
+  /** Shows the attack pose briefly after throwing an axe (ms). */
+  private throwPoseMs = 0;
+  private trailSteps = 0;
+  /** Bubble drawn around the knight while the shield is active. */
+  private readonly bubble: Phaser.GameObjects.Image;
 
   constructor(
     scene: Phaser.Scene,
@@ -111,17 +137,22 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.view = scene.add.sprite(x, y, TextureKey.PLAYER, 0).setOrigin(0.5, 1).setDepth(10);
     this.view.play(STATE_ANIMS.idle);
     this.slash = scene.add.image(x, y, TextureKey.SLASH).setOrigin(0, 0).setDepth(11).setVisible(false);
+    this.bubble = scene.add.image(x, y, TextureKey.SHIELD_BUBBLE).setDepth(12).setVisible(false);
     // POST_UPDATE runs after Arcade has moved the body for this frame.
     scene.events.on(Phaser.Scenes.Events.POST_UPDATE, this.syncView, this);
     this.once(Phaser.GameObjects.Events.DESTROY, () => {
       scene.events.off(Phaser.Scenes.Events.POST_UPDATE, this.syncView, this);
       this.view.destroy();
       this.slash.destroy();
+      this.bubble.destroy();
     });
   }
 
   private syncView(): void {
     this.view.setPosition(this.x, this.y);
+    this.bubble
+      .setPosition(this.x, this.y - PLAYER.HEIGHT / 2)
+      .setVisible(this.powerUps.has("shield") && this.powerUps.visible("shield"));
     const box = this.swordBox;
     this.slash.setVisible(box !== null);
     if (box) {
@@ -158,8 +189,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this._state;
   }
 
+  /** Can't be hurt: after a hit, after respawning, or while shielded. */
   get invincible(): boolean {
-    return this.invincibleMs > 0;
+    return this.invincibleMs > 0 || this.shielded;
+  }
+
+  get shielded(): boolean {
+    return this.powerUps.has("shield");
+  }
+
+  /** Pick up a power-up (or restart its timer). */
+  addPowerUp(kind: PowerUpKind): void {
+    this.powerUps.add(kind);
   }
 
   /**
@@ -194,6 +235,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.invincibleMs = Math.max(0, this.invincibleMs - dtMs);
     this.attackMs = Math.max(0, this.attackMs - dtMs);
     this.attackCooldownMs = Math.max(0, this.attackCooldownMs - dtMs);
+    this.axeCooldownMs = Math.max(0, this.axeCooldownMs - dtMs);
+    this.throwPoseMs = Math.max(0, this.throwPoseMs - dtMs);
+    for (const kind of this.powerUps.step(dtMs)) this.emit(PlayerEvent.POWERUP_END, kind);
     this.updateBlink();
 
     if (this.stunMs > 0) {
@@ -206,12 +250,20 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       return;
     }
 
-    // --- Sword (PL-9, CB-2) --------------------------------------------------
-    if (this.controls.consumeAttackPress() && this.attackCooldownMs <= 0) {
-      this.attackMs = SWORD.ACTIVE_MS;
-      this.attackCooldownMs = this.sword.cooldownMs;
-      this.swingId++;
-      this.emit(PlayerEvent.ATTACK);
+    // --- Attack: sword (PL-9, CB-2), or the throwing axe while active (CB-6) ---
+    if (this.controls.consumeAttackPress()) {
+      if (this.powerUps.has("axe")) {
+        if (this.axeCooldownMs <= 0) {
+          this.axeCooldownMs = POWERUP.AXE_COOLDOWN_MS;
+          this.throwPoseMs = SWORD.ACTIVE_MS;
+          this.emit(PlayerEvent.THROW_AXE, this.x, this.y - PLAYER.HEIGHT / 2, this.facing);
+        }
+      } else if (this.attackCooldownMs <= 0) {
+        this.attackMs = SWORD.ACTIVE_MS;
+        this.attackCooldownMs = this.sword.cooldownMs;
+        this.swingId++;
+        this.emit(PlayerEvent.ATTACK);
+      }
     }
 
     if (this.controls.consumeJumpPress()) {
@@ -223,7 +275,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // --- Horizontal movement ------------------------------------------------
     const dir = this.controls.direction;
     const control = grounded ? 1 : PHYSICS.AIR_CONTROL;
-    const target = dir * PHYSICS.RUN_SPEED;
+    const runSpeed = PHYSICS.RUN_SPEED * (this.powerUps.has("boots") ? POWERUP.BOOTS_SPEED : 1);
+    const target = dir * runSpeed;
     const braking = dir !== 0 && Math.sign(body.velocity.x) === -dir;
     let rate: number;
     if (dir === 0) {
@@ -257,6 +310,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         body.setVelocityY(body.velocity.y * PHYSICS.JUMP_CUT_FACTOR);
         this.jumpCuttable = false;
       }
+    }
+
+    if (this.powerUps.has("boots") && grounded && Math.abs(body.velocity.x) > PHYSICS.RUN_SPEED) {
+      if (++this.trailSteps % 6 === 0) this.emit(PlayerEvent.TRAIL);
     }
 
     // Don't turn around in the middle of a swing.
@@ -307,6 +364,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.bufferMs = 0;
     this.stunMs = 0;
     this.invincibleMs = invincible ? HEALTH.INVINCIBLE_MS : 0;
+    // Losing a life (respawning with invincibility) also loses power-ups.
+    if (invincible) this.powerUps.clear();
     this.jumpCuttable = false;
     this.wasGrounded = true; // no landing puff on respawn
     this.lastVy = 0;
@@ -315,6 +374,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.controls.consumeAttackPress();
     this.attackMs = 0;
     this.attackCooldownMs = 0;
+    this.axeCooldownMs = 0;
+    this.throwPoseMs = 0;
     this.squashTween?.stop();
     this.view.setScale(1);
     this.syncView();
@@ -345,7 +406,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const vy = this.body.velocity.y;
     if (this.stunMs > 0) {
       next = "hurt";
-    } else if (this.attackMs > 0) {
+    } else if (this.attackMs > 0 || this.throwPoseMs > 0) {
       next = "attack";
     } else if (!grounded) {
       next = vy < 0 ? "jump" : "fall";
