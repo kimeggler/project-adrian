@@ -1,26 +1,178 @@
 @import "tailwindcss";
 
+/* Retro palette, shared with the game's pixel art (src/game/art/sprites.ts). */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --sky-top: #3f8fd6;
+  --sky-bottom: #5fcde4;
+  --ink: #222034;
+  --steel: #9badb7;
+  --steel-light: #cbdbfc;
+  --gold: #fbf236;
+  --gold-dark: #df7126;
+  --night: #3f3f74;
+  --grass: #6abe30;
+  --grass-dark: #4b692f;
+  --dirt: #8f563b;
+  --dirt-dark: #663931;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-pixel), ui-monospace, monospace;
+  --font-mono: var(--font-pixel), ui-monospace, monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--ink);
+  color: #ffffff;
+  font-family: var(--font-pixel), ui-monospace, monospace;
+}
+
+/* Pixel-perfect game canvas: integer scaling is done in src/game/main.ts. */
+.game-container canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Game page: no scrolling, zooming or text selection while playing on touch. */
+.play-page {
+  position: relative;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+.rotate-hint {
+  display: none;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .rotate-hint {
+    display: block;
+    position: absolute;
+    inset: auto 0 1.5rem 0;
+    text-align: center;
+    font-size: 10px;
+    color: var(--steel-light);
+    pointer-events: none;
+  }
+}
+
+/* --- Landing page --------------------------------------------------------- */
+
+.landing {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5rem;
+  padding: 3rem 1rem 7rem;
+  background: linear-gradient(var(--sky-top), var(--sky-bottom) 70%);
+  overflow: hidden;
+}
+
+/* Grass and dirt strip along the bottom, like the game's ground tiles. */
+.landing-ground {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 4.5rem;
+  background:
+    linear-gradient(var(--grass) 0 12px, var(--grass-dark) 12px 16px, transparent 16px),
+    repeating-linear-gradient(90deg, var(--dirt) 0 22px, var(--dirt-dark) 22px 26px);
+}
+
+.pixel-title {
+  font-size: clamp(1.5rem, 7vw, 3rem);
+  line-height: 1.35;
+  color: var(--gold);
+  text-transform: uppercase;
+  text-shadow:
+    4px 4px 0 var(--ink),
+    -2px -2px 0 var(--gold-dark);
+}
+
+.pixel-button {
+  padding: 1rem 1.75rem;
+  font-size: 0.875rem;
+  color: var(--ink);
+  background: var(--gold);
+  border: 4px solid var(--ink);
+  box-shadow:
+    inset -4px -4px 0 var(--gold-dark),
+    4px 4px 0 var(--ink);
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.pixel-button:hover {
+  background: #fffb8a;
+}
+.pixel-button:active {
+  transform: translate(4px, 4px);
+  box-shadow: inset -4px -4px 0 var(--gold-dark);
+}
+.pixel-button:focus-visible {
+  outline: 4px dashed #ffffff;
+  outline-offset: 6px;
+}
+
+.pixel-panel {
+  padding: 1.25rem;
+  background: var(--night);
+  border: 4px solid var(--ink);
+  box-shadow:
+    inset 4px 4px 0 #5b6ee1,
+    4px 4px 0 var(--ink);
+}
+
+.pixel-key {
+  min-width: 2rem;
+  padding: 0.35rem 0.5rem;
+  text-align: center;
+  color: var(--ink);
+  background: var(--steel-light);
+  border: 2px solid var(--ink);
+  box-shadow: inset -2px -2px 0 var(--steel);
+}
+
+/* Settings controls */
+.pixel-range {
+  width: 100%;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+.pixel-switch {
+  appearance: none;
+  width: 2.5rem;
+  height: 1.25rem;
+  border: 2px solid var(--ink);
+  background: var(--steel);
+  box-shadow: inset 1.25rem 0 0 var(--steel-light);
+  cursor: pointer;
+}
+.pixel-switch:checked {
+  background: var(--grass);
+  box-shadow: inset -1.25rem 0 0 var(--steel-light);
+}
+.pixel-switch:focus-visible,
+.pixel-range:focus-visible {
+  outline: 2px dashed #ffffff;
+  outline-offset: 3px;
+}
+
+/* Steps through sprite frames laid out side by side (see PixelSprite). */
+.sprite-strip {
+  animation-name: sprite-frames;
+  animation-timing-function: steps(var(--frames));
+  animation-iteration-count: infinite;
+}
+@keyframes sprite-frames {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite-strip {
+    animation: none;
+  }
 }

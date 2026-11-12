@@ -1,69 +1,44 @@
-import Image from "next/image";
+import Controls from "@/components/landing/Controls";
+import PixelSprite from "@/components/landing/PixelSprite";
+import Records from "@/components/landing/Records";
+import SettingsPanel from "@/components/landing/SettingsPanel";
+import StartButton from "@/components/landing/StartButton";
+import { COIN_FRAMES, KNIGHT_FRAMES } from "@/game/art/sprites";
 
+/**
+ * Retro landing page (LP-1). Built from independent sections so more can be
+ * added (LP-2): records and settings are sections; character select and
+ * daily challenge (P2) can follow as new sections here or as their own routes.
+ */
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <main className="landing">
+      <section className="flex flex-col items-center gap-6 text-center">
+        <div className="flex items-center gap-4">
+          <PixelSprite frames={COIN_FRAMES} scale={4} fps={8} label="Spinning coin" />
+          <h1 className="pixel-title">
+            Little
+            <br />
+            Knight
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+          <PixelSprite frames={COIN_FRAMES} scale={4} fps={8} label="Spinning coin" />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+        <PixelSprite frames={KNIGHT_FRAMES.run} scale={6} fps={10} label="The little knight, running" />
+        <p className="max-w-sm text-[10px] leading-relaxed text-white [text-shadow:2px_2px_0_#222034]">
+          A tiny knight. A big, random world. Every run is new.
+        </p>
+        <StartButton />
+        <Records />
+      </section>
+
+      <Controls />
+      <SettingsPanel />
+
+      <footer className="text-center text-[8px] leading-relaxed text-[#222034]">
+        All art and sounds are original. Font: Press Start 2P (SIL OFL).
+      </footer>
+
+      <div className="landing-ground" aria-hidden />
+    </main>
   );
 }
