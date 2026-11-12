@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  difficultyFor,
   ENEMY,
   LEVELGEN,
   maxGapTiles,
@@ -130,7 +131,7 @@ describe("level generator", () => {
     }
   }, SLOW);
 
-  it("places walkers only on free, flat patrol areas", () => {
+  it("places enemies only on free, flat patrol areas", () => {
     const safe = WORLD.SAFE_ZONE_TILES;
     const perLevel: number[][] = Array.from({ length: LEVELS }, () => []);
     for (const { seed, level } of cases.slice(0, 300)) {
@@ -164,6 +165,28 @@ describe("level generator", () => {
     // Every level type has some enemies, and harder levels have more.
     expect(avg(perLevel[0])).toBeGreaterThan(0.5);
     expect(avg(perLevel[LEVELS - 1])).toBeGreaterThan(avg(perLevel[0]));
+  }, SLOW);
+
+  it("mixes enemy kinds and scales their strength by level (CB-4, CB-7)", () => {
+    const kinds = (level: number) => {
+      const counts = { walker: 0, jumper: 0, shooter: 0 };
+      for (let seed = 1; seed <= 60; seed++) {
+        for (const e of generateLevel(seed, level).level.enemies) {
+          counts[e.kind]++;
+          const d = difficultyFor(level);
+          expect(e.damage).toBe(d.damage);
+          expect(e.speed).toBe(d.walkerSpeed);
+          expect(e.hp).toBeGreaterThanOrEqual(2 + d.hpBonus);
+        }
+      }
+      return counts;
+    };
+    const first = kinds(1);
+    expect(first.jumper + first.shooter).toBe(0); // level 1: walkers only
+    const later = kinds(8);
+    expect(later.walker).toBeGreaterThan(0);
+    expect(later.jumper).toBeGreaterThan(0);
+    expect(later.shooter).toBeGreaterThan(0);
   }, SLOW);
 
   it("places coins in free space only", () => {

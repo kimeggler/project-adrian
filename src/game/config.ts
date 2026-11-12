@@ -121,13 +121,16 @@ export const LEVELGEN = {
 } as const;
 
 /**
- * Difficulty per level number (1-based). Levels beyond the table use the
- * last row. All difficulty scaling lives here (CB-7 will add enemy columns).
+ * Difficulty per level number (1-based), CB-7. ALL difficulty scaling lives
+ * here: terrain columns and enemy columns, merged into one row per level.
+ * Levels beyond the table use the last row.
  *
- * Weights are relative chances of picking each segment type.
+ * Terrain weights are relative chances of picking each segment type;
  * `maxGap` / `maxSpikes` are further capped by the physics-derived limits.
+ * Terrain stops changing after level 6 (levels 7+ reuse that row), so the
+ * terrain of every existing seed stays the same; enemies keep getting harder.
  */
-export interface DifficultyRow {
+export interface TerrainDifficulty {
   flat: number;
   step: number;
   gap: number;
@@ -140,20 +143,56 @@ export interface DifficultyRow {
   maxSpikes: number;
   /** Chance that a flat stretch gets a row of coins. */
   coinChance: number;
-  /** Chance that a suitable flat stretch gets a walker enemy (CB-1). */
-  enemyChance: number;
-  /** Walker speed in px/s (CB-7). */
-  walkerSpeed: number;
 }
 
-export const DIFFICULTY: readonly DifficultyRow[] = [
-  { flat: 4, step: 3, gap: 2, spikes: 1, obstacle: 2, platform: 0, maxGap: 2, maxSpikes: 1, coinChance: 0.5, enemyChance: 0.15, walkerSpeed: 24 },
-  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 1, maxGap: 2, maxSpikes: 1, coinChance: 0.5, enemyChance: 0.25, walkerSpeed: 26 },
-  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.5, enemyChance: 0.35, walkerSpeed: 28 },
-  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.45, enemyChance: 0.4, walkerSpeed: 30 },
-  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4, enemyChance: 0.45, walkerSpeed: 33 },
-  { flat: 1, step: 3, gap: 5, spikes: 4, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4, enemyChance: 0.5, walkerSpeed: 36 },
+export interface EnemyDifficulty {
+  /** Chance that a suitable flat stretch gets an enemy (density). */
+  enemyChance: number;
+  /** Relative chances of each enemy kind (CB-4). */
+  walkerWeight: number;
+  jumperWeight: number;
+  shooterWeight: number;
+  /** Walker and jumper walking speed (px/s). */
+  walkerSpeed: number;
+  /** Extra hit points on top of each kind's base HP. */
+  hpBonus: number;
+  /** Hearts lost on contact or when hit by a projectile (attack power). */
+  damage: number;
+  /** Shooter: time between shots (ms), and projectile speed (px/s). */
+  fireIntervalMs: number;
+  projectileSpeed: number;
+}
+
+export type DifficultyRow = TerrainDifficulty & EnemyDifficulty;
+
+const TERRAIN_BY_LEVEL: readonly TerrainDifficulty[] = [
+  { flat: 4, step: 3, gap: 2, spikes: 1, obstacle: 2, platform: 0, maxGap: 2, maxSpikes: 1, coinChance: 0.5 },
+  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 1, maxGap: 2, maxSpikes: 1, coinChance: 0.5 },
+  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.5 },
+  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.45 },
+  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4 },
+  { flat: 1, step: 3, gap: 5, spikes: 4, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4 },
 ];
+
+// prettier-ignore
+const ENEMIES_BY_LEVEL: readonly EnemyDifficulty[] = [
+  { enemyChance: 0.15, walkerWeight: 1, jumperWeight: 0, shooterWeight: 0, walkerSpeed: 24, hpBonus: 0, damage: 1, fireIntervalMs: 2600, projectileSpeed: 70 },
+  { enemyChance: 0.25, walkerWeight: 4, jumperWeight: 1, shooterWeight: 0, walkerSpeed: 26, hpBonus: 0, damage: 1, fireIntervalMs: 2600, projectileSpeed: 70 },
+  { enemyChance: 0.35, walkerWeight: 4, jumperWeight: 1, shooterWeight: 1, walkerSpeed: 28, hpBonus: 0, damage: 1, fireIntervalMs: 2400, projectileSpeed: 75 },
+  { enemyChance: 0.4, walkerWeight: 4, jumperWeight: 2, shooterWeight: 1, walkerSpeed: 30, hpBonus: 0, damage: 1, fireIntervalMs: 2200, projectileSpeed: 80 },
+  { enemyChance: 0.45, walkerWeight: 4, jumperWeight: 2, shooterWeight: 2, walkerSpeed: 33, hpBonus: 1, damage: 1, fireIntervalMs: 2000, projectileSpeed: 85 },
+  { enemyChance: 0.5, walkerWeight: 3, jumperWeight: 2, shooterWeight: 2, walkerSpeed: 36, hpBonus: 1, damage: 1, fireIntervalMs: 1800, projectileSpeed: 90 },
+  { enemyChance: 0.52, walkerWeight: 3, jumperWeight: 3, shooterWeight: 2, walkerSpeed: 38, hpBonus: 1, damage: 2, fireIntervalMs: 1700, projectileSpeed: 95 },
+  { enemyChance: 0.55, walkerWeight: 3, jumperWeight: 3, shooterWeight: 3, walkerSpeed: 40, hpBonus: 2, damage: 2, fireIntervalMs: 1600, projectileSpeed: 100 },
+  { enemyChance: 0.57, walkerWeight: 3, jumperWeight: 3, shooterWeight: 3, walkerSpeed: 42, hpBonus: 2, damage: 2, fireIntervalMs: 1500, projectileSpeed: 105 },
+  { enemyChance: 0.6, walkerWeight: 3, jumperWeight: 3, shooterWeight: 3, walkerSpeed: 45, hpBonus: 3, damage: 2, fireIntervalMs: 1400, projectileSpeed: 110 },
+];
+
+/** The difficulty table: one merged row per level. */
+export const DIFFICULTY: readonly DifficultyRow[] = ENEMIES_BY_LEVEL.map((enemies, i) => ({
+  ...TERRAIN_BY_LEVEL[Math.min(i, TERRAIN_BY_LEVEL.length - 1)],
+  ...enemies,
+}));
 
 export function difficultyFor(level: number): DifficultyRow {
   const i = Math.min(Math.max(1, Math.floor(level)), DIFFICULTY.length) - 1;
@@ -277,8 +316,6 @@ export const ENEMY = {
   /** Walker hitbox (px), bottom-centered. */
   HITBOX_WIDTH: 12,
   HITBOX_HEIGHT: 9,
-  /** Hearts lost when touching an enemy from the side or below. */
-  CONTACT_DAMAGE: 1,
   /**
    * A stomp counts if the player is falling and their feet were at most
    * this far below the enemy's top on the previous physics step (px).
@@ -300,8 +337,10 @@ export const ENEMY = {
   CHECKPOINT_CLEARANCE: 3,
   /** Walk animation speed (frames per second). */
   WALK_FPS: 4,
-  /** Sword hits a walker takes (a stomp always defeats it). */
+  /** Base hit points per kind; the difficulty table adds `hpBonus` (CB-7). */
   WALKER_HP: 2,
+  JUMPER_HP: 2,
+  SHOOTER_HP: 3,
   /** White flash when hit (ms). */
   HIT_FLASH_MS: 80,
 } as const;
@@ -310,20 +349,73 @@ export const ENEMY = {
 // Sword (PL-9, CB-2) — Phase 8
 // ---------------------------------------------------------------------------
 
+/** Sword basics (damage, reach and speed come from SWORD_UPGRADES). */
 export const SWORD = {
-  DAMAGE: 1,
-  /** Hitbox in front of the player's body (px). */
-  RANGE: 14,
   HEIGHT: 10,
   /** Hitbox top, measured down from the top of the player's body (px). */
   OFFSET_Y: 2,
   /** How long the hitbox is active per swing (ms, ≈ 7 frames). */
   ACTIVE_MS: 120,
-  /** Time from one swing to the next (ms). */
-  COOLDOWN_MS: 350,
   /** Enemy knockback from a sword hit (px/s). */
   ENEMY_KNOCKBACK_VX: 110,
 } as const;
+
+export const JUMPER = {
+  HITBOX_WIDTH: 12,
+  HITBOX_HEIGHT: 10,
+  /** Hop strength (px/s, ≈ 35 px high) and pause between hops (ms). */
+  JUMP_VELOCITY: -250,
+  JUMP_INTERVAL_MS: 900,
+} as const;
+
+export const SHOOTER = {
+  HITBOX_WIDTH: 12,
+  HITBOX_HEIGHT: 12,
+  /** Only shoots when the player is this close horizontally (px)… */
+  RANGE_X: 150,
+  /** …and at roughly the same height (px). */
+  RANGE_Y: 40,
+  /** Glows before each shot so the player can react (ms). */
+  CHARGE_MS: 400,
+  /** Projectile start: in front of the mouth, this far above the feet (px). */
+  MOUTH_Y: 6,
+} as const;
+
+export const PROJECTILE = {
+  SIZE: 6,
+  HITBOX: 4,
+  /** Disappears after flying this far (px). */
+  MAX_DISTANCE: 220,
+} as const;
+
+/**
+ * Sword upgrades by level number (CB-5). The sword gets the last row whose
+ * `fromLevel` the current level has reached. `label` is shown when it starts.
+ */
+export interface SwordStats {
+  fromLevel: number;
+  damage: number;
+  /** Hitbox length in front of the player (px). */
+  range: number;
+  cooldownMs: number;
+  label: string;
+}
+
+export const SWORD_UPGRADES: readonly SwordStats[] = [
+  { fromLevel: 1, damage: 1, range: 14, cooldownMs: 350, label: "Sword" },
+  { fromLevel: 3, damage: 1, range: 18, cooldownMs: 350, label: "Longer reach" },
+  { fromLevel: 5, damage: 2, range: 18, cooldownMs: 280, label: "Double damage, faster swings" },
+  { fromLevel: 8, damage: 2, range: 22, cooldownMs: 250, label: "Longest reach" },
+];
+
+/** Sword stats and upgrade level (1-based) for a level number. */
+export function swordForLevel(level: number): SwordStats & { swordLevel: number } {
+  let index = 0;
+  SWORD_UPGRADES.forEach((row, i) => {
+    if (level >= row.fromLevel) index = i;
+  });
+  return { ...SWORD_UPGRADES[index], swordLevel: index + 1 };
+}
 
 export const SPIKES = {
   /** Hitbox (px), bottom-centered in the 16×16 tile. Smaller than the art, to be fair. */

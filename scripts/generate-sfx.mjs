@@ -43,6 +43,8 @@ const SOUNDS = {
   stomp: ["jump", 31, { p_base_freq: 0.22, p_freq_ramp: 0.3, p_env_sustain: 0.1, p_env_decay: 0.22 }],
   swordSwing: ["laserShoot", 17, { wave_type: 3, p_base_freq: 0.55, p_freq_ramp: -0.35, p_env_attack: 0, p_env_sustain: 0.1, p_env_decay: 0.2, sound_vol: 0.18 }],
   enemyHit: ["hitHurt", 44, { p_env_decay: 0.15 }],
+  shoot: ["laserShoot", 5, { p_base_freq: 0.35, p_env_decay: 0.12, sound_vol: 0.15 }],
+  swordUpgrade: ["powerUp", 77, { p_env_sustain: 0.25, p_env_decay: 0.3, p_arp_mod: 0.35, p_arp_speed: 0.5 }],
 };
 
 const COMMON = { sound_vol: 0.25, sample_rate: 44100, sample_size: 16 };

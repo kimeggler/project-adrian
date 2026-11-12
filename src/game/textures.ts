@@ -17,7 +17,10 @@ import {
   KNIGHT_FRAMES,
   KNIGHT_SIZE,
   SLASH,
+  HOPPER_FRAMES,
+  ROCK,
   SLIME_FRAMES,
+  TOTEM_FRAMES,
   SPIKES,
   type Sprite,
 } from "./art/sprites";
@@ -29,6 +32,9 @@ export const TextureKey = {
   TILES: "tiles",
   PLAYER: "knight",
   SLIME: "slime",
+  HOPPER: "hopper",
+  TOTEM: "totem",
+  ROCK: "rock",
   FLAG: "flag",
   CHECKPOINT_OFF: "checkpoint-off",
   CHECKPOINT_ON: "checkpoint-on",
@@ -62,6 +68,9 @@ export const AnimKey = {
 
 /** Frame index of the squashed slime in the slime sheet. */
 export const SLIME_SQUASHED_FRAME = SLIME_FRAMES.walk.length;
+/** Frame indices in the hopper and totem sheets. */
+export const HOPPER_FRAME = { CROUCH: 0, AIR: 1 } as const;
+export const TOTEM_FRAME = { IDLE: 0, CHARGE: 1 } as const;
 
 /** Frame rates per animation (frames per second). */
 const ANIM_FPS = { idle: 3, run: 12, coin: 8 } as const;
@@ -72,6 +81,8 @@ export function createTextures(scene: Phaser.Scene): void {
   createSheet(scene, TextureKey.PLAYER, Object.values(KNIGHT_FRAMES).flat(), KNIGHT_SIZE);
   createSheet(scene, TextureKey.COIN, COIN_FRAMES, COIN.SIZE);
   createSheet(scene, TextureKey.SLIME, [...SLIME_FRAMES.walk, ...SLIME_FRAMES.squashed], ENEMY.SIZE);
+  createSheet(scene, TextureKey.HOPPER, [...HOPPER_FRAMES.crouch, ...HOPPER_FRAMES.air], ENEMY.SIZE);
+  createSheet(scene, TextureKey.TOTEM, [...TOTEM_FRAMES.idle, ...TOTEM_FRAMES.charge], ENEMY.SIZE);
   for (const [key, sprite] of [
     [TextureKey.FLAG, FLAG],
     [TextureKey.CHECKPOINT_OFF, CHECKPOINT_OFF],
@@ -81,6 +92,7 @@ export function createTextures(scene: Phaser.Scene): void {
     [TextureKey.HEART_EMPTY, HEART_EMPTY],
     [TextureKey.DUST, DUST],
     [TextureKey.SLASH, SLASH],
+    [TextureKey.ROCK, ROCK],
   ] as const) {
     createImage(scene, key, sprite);
   }

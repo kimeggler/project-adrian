@@ -16,11 +16,14 @@ import {
   KNIGHT_FRAMES,
   KNIGHT_SIZE,
   PALETTE,
+  HOPPER_FRAMES,
+  ROCK,
   SLIME_FRAMES,
+  TOTEM_FRAMES,
   SPIKES,
   type Sprite,
 } from "./sprites";
-import { CHECKPOINT, COIN, ENEMY, FLAG as FLAG_SIZE, TILE } from "../config";
+import { CHECKPOINT, COIN, ENEMY, FLAG as FLAG_SIZE, PROJECTILE, TILE } from "../config";
 
 const sprites: Record<string, { sprite: Sprite; w: number; h: number }> = {
   spikes: { sprite: SPIKES, w: TILE, h: TILE },
@@ -36,11 +39,19 @@ const sprites: Record<string, { sprite: Sprite; w: number; h: number }> = {
   iconPause: { sprite: ICON_PAUSE, w: 8, h: 8 },
   iconSword: { sprite: ICON_SWORD, w: 8, h: 8 },
   slash: { sprite: SLASH, w: 16, h: 9 },
+  rock: { sprite: ROCK, w: PROJECTILE.SIZE, h: PROJECTILE.SIZE },
 };
 for (const [anim, frames] of Object.entries(KNIGHT_FRAMES)) {
   frames.forEach((sprite, i) => {
     sprites[`knight.${anim}.${i}`] = { sprite, w: KNIGHT_SIZE, h: KNIGHT_SIZE };
   });
+}
+for (const [name, set] of Object.entries({ hopper: HOPPER_FRAMES, totem: TOTEM_FRAMES })) {
+  for (const [anim, frames] of Object.entries(set)) {
+    frames.forEach((sprite, i) => {
+      sprites[`${name}.${anim}.${i}`] = { sprite, w: ENEMY.SIZE, h: ENEMY.SIZE };
+    });
+  }
 }
 for (const [anim, frames] of Object.entries(SLIME_FRAMES)) {
   frames.forEach((sprite, i) => {

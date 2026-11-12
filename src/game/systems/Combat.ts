@@ -28,17 +28,18 @@ export interface Rect {
 }
 
 /**
- * The sword's hitbox (CB-2): a box right in front of the player's body, at
- * hand height. `facing` is 1 for right, -1 for left.
+ * The sword's hitbox (CB-2): a box `range` px long right in front of the
+ * player's body, at hand height. `facing` is 1 for right, -1 for left.
  */
 export function swordHitbox(
   body: { left: number; right: number; top: number },
   facing: 1 | -1,
+  range: number,
 ): Rect {
   return {
-    x: facing > 0 ? body.right : body.left - SWORD.RANGE,
+    x: facing > 0 ? body.right : body.left - range,
     y: body.top + SWORD.OFFSET_Y,
-    width: SWORD.RANGE,
+    width: range,
     height: SWORD.HEIGHT,
   };
 }

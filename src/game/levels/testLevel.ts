@@ -76,7 +76,18 @@ export function buildTestLevel(): Level {
     coins: [],
     // One walker under the low ceiling: tests stomping with little headroom.
     enemies: [
-      { kind: "walker", x: 66 * TILE + TILE / 2, y: (H - 2) * TILE, minX: 63 * TILE, maxX: 71 * TILE, speed: 28 },
+      {
+        kind: "walker",
+        x: 66 * TILE + TILE / 2,
+        y: (H - 2) * TILE,
+        minX: 63 * TILE,
+        maxX: 71 * TILE,
+        speed: 28,
+        hp: 2,
+        damage: 1,
+        fireIntervalMs: 0,
+        projectileSpeed: 0,
+      },
     ],
   };
 }

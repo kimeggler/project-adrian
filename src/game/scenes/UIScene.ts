@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { GAME_WIDTH } from "../config";
+import { GAME_WIDTH, UI } from "../config";
 import { getVirtualPad } from "../systems/Input";
 import { TextureKey } from "../textures";
 import { TouchControls } from "../ui/TouchControls";
@@ -65,8 +65,19 @@ export class UIScene extends Phaser.Scene {
   update(): void {
     const game = this.scene.get(SceneKey.GAME) as GameScene;
     if (!game.player) return;
+    const toast = game.consumeToast?.();
+    if (toast) this.showToast(toast);
     this.updateHud(game.hud);
     if (this.debugVisible) this.updateDebug(game);
+  }
+
+  /** Short centered announcement, e.g. a sword upgrade (CB-5). */
+  private showToast(message: string): void {
+    const text = this.add
+      .text(GAME_WIDTH / 2, 30, message, textStyle({ color: UI.ACCENT, stroke: "#000000", strokeThickness: 2, align: "center" }))
+      .setOrigin(0.5, 0)
+      .setLineSpacing(4);
+    this.tweens.add({ targets: text, alpha: 0, delay: 2200, duration: 400, onComplete: () => text.destroy() });
   }
 
   private updateHud(hud: HudState): void {

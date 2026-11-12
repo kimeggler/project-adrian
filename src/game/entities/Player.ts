@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { ENEMY, HEALTH, JUICE, PHYSICS, PLAYER, SWORD } from "../config";
+import { ENEMY, HEALTH, JUICE, PHYSICS, PLAYER, SWORD, SWORD_UPGRADES, type SwordStats } from "../config";
 import { swordHitbox, type Rect } from "../systems/Combat";
 import { AnimKey, TextureKey } from "../textures";
 import type { PlayerInput } from "../systems/Input";
@@ -84,6 +84,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private attackCooldownMs = 0;
   /** Increases with every swing, so each swing hits an enemy only once. */
   private swingId = 0;
+  /** Current sword (CB-5 upgrades). */
+  private sword: SwordStats = SWORD_UPGRADES[0];
 
   constructor(
     scene: Phaser.Scene,
@@ -126,14 +128,25 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       // Center the 9 px tall swoosh on the hitbox; flip it when facing left.
       this.slash
         .setFlipX(this.facing < 0)
-        .setPosition(box.x + (this.facing > 0 ? 0 : box.width - this.slash.width), box.y + (box.height - this.slash.height) / 2)
+        .setPosition(box.x, box.y + (box.height - this.slash.displayHeight) / 2)
         .setAlpha(Math.min(1, this.attackMs / (SWORD.ACTIVE_MS / 2)));
     }
   }
 
   /** The active sword hitbox, or null between swings (CB-2). */
   get swordBox(): Rect | null {
-    return this.attackMs > 0 ? swordHitbox(this.body, this.facing) : null;
+    return this.attackMs > 0 ? swordHitbox(this.body, this.facing, this.sword.range) : null;
+  }
+
+  /** Damage of the current sword. */
+  get swordDamage(): number {
+    return this.sword.damage;
+  }
+
+  /** Equip a sword upgrade (CB-5). The slash sprite stretches to the reach. */
+  setSword(stats: SwordStats): void {
+    this.sword = stats;
+    this.slash.setScale(stats.range / this.slash.frame.width, 1);
   }
 
   /** Identifies the current swing (see `swordBox`). */
@@ -196,7 +209,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // --- Sword (PL-9, CB-2) --------------------------------------------------
     if (this.controls.consumeAttackPress() && this.attackCooldownMs <= 0) {
       this.attackMs = SWORD.ACTIVE_MS;
-      this.attackCooldownMs = SWORD.COOLDOWN_MS;
+      this.attackCooldownMs = this.sword.cooldownMs;
       this.swingId++;
       this.emit(PlayerEvent.ATTACK);
     }

@@ -6,17 +6,28 @@ export interface Point {
   y: number;
 }
 
-/** An enemy and the stretch of ground it patrols (CB-1, CB-4). */
+export type EnemyKind = "walker" | "jumper" | "shooter";
+
+/**
+ * An enemy, the stretch of ground it stays on, and its strength (CB-4, CB-7).
+ * Stats come from the difficulty table when the level is generated.
+ */
 export interface EnemySpawn {
-  kind: "walker";
+  kind: EnemyKind;
   /** Start position: bottom-center, standing on the ground (px). */
   x: number;
   y: number;
-  /** Patrol bounds (px): the enemy turns around when its body reaches them. */
+  /** Patrol bounds (px): walkers and jumpers turn around at them. */
   minX: number;
   maxX: number;
-  /** Walking speed (px/s), from the difficulty table. */
+  /** Walking speed (px/s). */
   speed: number;
+  hp: number;
+  /** Hearts lost on contact (and per projectile for shooters). */
+  damage: number;
+  /** Shooters only. */
+  fireIntervalMs: number;
+  projectileSpeed: number;
 }
 
 /** Everything GameScene needs to build a level. */

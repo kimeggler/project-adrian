@@ -312,3 +312,95 @@ export const SLIME_FRAMES = {
     ],
   ],
 } as const;
+
+// ---------------------------------------------------------------------------
+// Jumper enemy: a blue hopper (16×16 frames, facing right)
+// ---------------------------------------------------------------------------
+
+const HOPPER_CROUCH: Sprite = [
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  ".....OO..OO.....",
+  "....OWOOOOWO....",
+  "...OBBBBBBBBO...",
+  "..OBBhBBBBBBBO..",
+  "..OBBBBBBBBBBO..",
+  ".OBBBBBBBBBBBBO.",
+  ".ObBBBBBBBBBBbO.",
+  "OObbbbbbbbbbbbOO",
+  "OYYO........OYYO",
+];
+
+const HOPPER_AIR: Sprite = [
+  "................",
+  "................",
+  "................",
+  "................",
+  ".....OO..OO.....",
+  "....OWOOOOWO....",
+  "...OBBBBBBBBO...",
+  "...OBhBBBBBBO...",
+  "...OBBBBBBBBO...",
+  "...OBBBBBBBBO...",
+  "...ObBBBBBBbO...",
+  "....ObbbbbbO....",
+  "....OYO..OYO....",
+  "....OYO..OYO....",
+  "...OYYO..OYYO...",
+  "................",
+];
+
+export const HOPPER_FRAMES = { crouch: [HOPPER_CROUCH], air: [HOPPER_AIR] } as const;
+
+// ---------------------------------------------------------------------------
+// Shooter enemy: a stone totem that spits rocks (16×16 frames, facing right)
+// ---------------------------------------------------------------------------
+
+const TOTEM_TOP = [
+  "................",
+  "................",
+  "................",
+  "................",
+  "...OOOOOOOOOO...",
+  "..OhhHHHHHHHsO..",
+  "..OhHHHHHHHHsO..",
+];
+const TOTEM_BOTTOM = [
+  "..OHHHHHHHOOOO..",
+  "..OHHHHHHHHHsO..",
+  "..OsHHHHHHHHsO..",
+  ".OssssssssssssO.",
+  ".OOOOOOOOOOOOOO.",
+];
+
+export const TOTEM_FRAMES = {
+  idle: [
+    [
+      ...TOTEM_TOP,
+      "..OHHHORHHORsO..",
+      "..OHHHHHHHHHsO..",
+      "..OHHHHHHOOOOO..",
+      "..OHHHHHHOvvvO..",
+      ...TOTEM_BOTTOM,
+    ],
+  ],
+  /** Eyes and mouth glow just before it shoots (a warning for the player). */
+  charge: [
+    [
+      ...TOTEM_TOP,
+      "..OHHHOWHHOWsO..",
+      "..OHHHHHHHHHsO..",
+      "..OHHHHHHOOOOO..",
+      "..OHHHHHHOYYYO..",
+      ...TOTEM_BOTTOM,
+    ],
+  ],
+} as const;
+
+/** The totem's rock, 6×6. */
+export const ROCK: Sprite = [".OOOO.", "OhHHsO", "OHhHsO", "OHHssO", "OsssvO", ".OOOO."];

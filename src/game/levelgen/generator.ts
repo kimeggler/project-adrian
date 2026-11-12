@@ -15,7 +15,7 @@ import {
   WORLD,
   type DifficultyRow,
 } from "../config";
-import type { EnemySpawn, Level, Point } from "../levels/level";
+import type { EnemyKind, EnemySpawn, Level, Point } from "../levels/level";
 import { TileId, type LevelData } from "../tiles";
 import { checkReachability } from "./reachability";
 import { hash32, Rng } from "./rng";
@@ -76,20 +76,33 @@ interface Layout {
 export function buildLevel(rngSeed: number, difficulty: DifficultyRow): Level {
   const layout = buildLayout(new Rng(rngSeed), difficulty);
   const level = toLevel(layout);
-  // Enemies use their own random stream, so adding them (phase 7) didn't
-  // change the terrain of any existing seed.
-  level.enemies = placeEnemies(level, layout, new Rng(hash32(rngSeed ^ 0x5eede11e)), difficulty);
+  // Enemies use their own random streams, so adding them didn't change the
+  // terrain of any existing seed (phase 7), and choosing their kind didn't
+  // change where they are (phase 9).
+  level.enemies = placeEnemies(
+    level,
+    layout,
+    new Rng(hash32(rngSeed ^ 0x5eede11e)),
+    new Rng(hash32(rngSeed ^ 0x6b1d5a7e)),
+    difficulty,
+  );
   return level;
 }
 
 /**
- * Walkers patrol flat stretches of ground: no spikes, no obstacles, enough
+ * Enemies stay on flat stretches of ground: no spikes, no obstacles, enough
  * headroom to jump over or onto them, and away from the spawn, flag and
  * checkpoint areas. They never leave their stretch, so they can't block a
  * path the reachability check relies on: the player can always jump over
  * a walker, or stomp it, on open flat ground.
  */
-function placeEnemies(level: Level, layout: Layout, rng: Rng, diff: DifficultyRow): EnemySpawn[] {
+function placeEnemies(
+  level: Level,
+  layout: Layout,
+  rng: Rng,
+  kindRng: Rng,
+  diff: DifficultyRow,
+): EnemySpawn[] {
   const { ground, spikeCols, checkpointCol } = layout;
   const spikes = new Set(spikeCols);
   const free = (c: number) => {
@@ -117,13 +130,23 @@ function placeEnemies(level: Level, layout: Layout, rng: Rng, diff: DifficultyRo
       const e = Math.min(end, s + ENEMY.MAX_PATROL_TILES - 1);
       if (e - s + 1 < ENEMY.MIN_PATROL_TILES || !rng.chance(diff.enemyChance)) continue;
       const col = rng.int(s + 1, e - 1);
+      const kind = kindRng.weighted<EnemyKind>({
+        walker: diff.walkerWeight,
+        jumper: diff.jumperWeight,
+        shooter: diff.shooterWeight,
+      });
+      const baseHp = { walker: ENEMY.WALKER_HP, jumper: ENEMY.JUMPER_HP, shooter: ENEMY.SHOOTER_HP }[kind];
       enemies.push({
-        kind: "walker",
+        kind,
         x: col * TILE + TILE / 2,
         y: surfaceRow(ground[col]) * TILE,
         minX: s * TILE,
         maxX: (e + 1) * TILE,
         speed: diff.walkerSpeed,
+        hp: baseHp + diff.hpBonus,
+        damage: diff.damage,
+        fireIntervalMs: diff.fireIntervalMs,
+        projectileSpeed: diff.projectileSpeed,
       });
     }
     c = end + 1;

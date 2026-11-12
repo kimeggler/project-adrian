@@ -141,13 +141,22 @@ export function updateSettings(patch: Partial<Settings>): Settings {
   return updateSave((d) => ({ ...d, settings: { ...d.settings, ...patch } })).settings;
 }
 
-/** Record progress: keeps the best score and the highest level reached. */
-export function recordProgress({ score, level }: { score?: number; level?: number }): void {
+/** Record progress: keeps the best score, highest level and best sword reached. */
+export function recordProgress({
+  score,
+  level,
+  weaponLevel,
+}: {
+  score?: number;
+  level?: number;
+  weaponLevel?: number;
+}): void {
   const d = getSave();
   const bestScore = Math.max(d.bestScore, score ?? 0);
   const highestLevel = Math.max(d.highestLevel, level ?? 0);
-  if (bestScore === d.bestScore && highestLevel === d.highestLevel) return;
-  updateSave((s) => ({ ...s, bestScore, highestLevel }));
+  const bestWeapon = Math.max(d.weaponLevel, weaponLevel ?? 0);
+  if (bestScore === d.bestScore && highestLevel === d.highestLevel && bestWeapon === d.weaponLevel) return;
+  updateSave((s) => ({ ...s, bestScore, highestLevel, weaponLevel: bestWeapon }));
 }
 
 /** Subscribe to save changes (e.g. the landing page). Returns an unsubscribe function. */

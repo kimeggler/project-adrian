@@ -8,16 +8,20 @@ import {
   GAME_WIDTH,
   GAMEPAD,
   HEALTH,
-  ENEMY,
   JUICE,
   SCORE,
   SPIKES,
-  SWORD,
+  swordForLevel,
   TILE,
   WORLD,
 } from "../config";
 import { Player, PlayerEvent } from "../entities/Player";
+import type { Enemy } from "../entities/Enemy";
+import { Jumper } from "../entities/Jumper";
+import { Projectile } from "../entities/Projectile";
+import { Shooter } from "../entities/Shooter";
 import { Walker } from "../entities/Walker";
+import type { EnemySpawn } from "../levels/level";
 import { isStomp, overlaps, type Rect } from "../systems/Combat";
 import { GameEvent } from "../events";
 import { generateLevel } from "../levelgen/generator";
@@ -50,7 +54,10 @@ export class GameScene extends Phaser.Scene {
   private coins = 0;
   /** Enemies defeated in this level (stomp or sword). */
   private stomps = 0;
-  private walkers: Walker[] = [];
+  private enemies: Enemy[] = [];
+  private projectiles!: Phaser.Physics.Arcade.Group;
+  /** Message for the HUD to show once (e.g. a sword upgrade). */
+  private toast?: string;
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
   private swordDebug?: Phaser.GameObjects.Graphics;
   /** Lives when this level began; "Restart level" goes back to this. */
@@ -71,7 +78,8 @@ export class GameScene extends Phaser.Scene {
     this.scoreAtStart = data.score ?? 0;
     this.coins = 0;
     this.stomps = 0;
-    this.walkers = [];
+    this.enemies = [];
+    this.toast = undefined;
     this.swordDebug = undefined; // destroyed with the previous level's objects
     this.livesAtStart = data.lives ?? HEALTH.START_LIVES;
     this.health = new Health(this.livesAtStart);
@@ -126,6 +134,7 @@ export class GameScene extends Phaser.Scene {
     // --- Player --------------------------------------------------------------
     const input = new PlayerInput(this);
     this.player = new Player(this, spawn.x, spawn.y, input);
+    this.equipSword();
     this.createJuice();
     this.physics.add.collider(this.player, layer);
     this.physics.add.overlap(this.player, flagSprite, () => this.completeLevel());
@@ -136,9 +145,13 @@ export class GameScene extends Phaser.Scene {
       this.onCheckpoint(cp as Phaser.Physics.Arcade.Image),
     );
     // --- Enemies (phase 7) ------------------------------------------------------
-    this.walkers = this.level.enemies.map((spawn) => new Walker(this, spawn));
-    this.physics.add.collider(this.walkers, layer);
-    this.physics.add.overlap(this.player, this.walkers, (_p, w) => this.onEnemyContact(w as Walker));
+    this.enemies = this.level.enemies.map((spawn) => this.createEnemy(spawn));
+    this.physics.add.collider(this.enemies, layer);
+    this.physics.add.overlap(this.player, this.enemies, (_p, e) => this.onEnemyContact(e as Enemy));
+
+    this.projectiles = this.physics.add.group({ allowGravity: false });
+    this.physics.add.collider(this.projectiles, layer, (p) => (p as Projectile).destroy());
+    this.physics.add.overlap(this.player, this.projectiles, (_p, p) => this.onProjectileHit(p as Projectile));
 
     this.physics.add.overlap(this.player, coins, (_p, coin) =>
       this.onCoin(coin as Phaser.Physics.Arcade.Image),
@@ -149,7 +162,8 @@ export class GameScene extends Phaser.Scene {
     const onStep = (dt: number) => {
       this.elapsedMs += dt * 1000;
       this.player.step(dt);
-      for (const w of this.walkers) w.step(dt);
+      for (const e of this.enemies) e.step(dt, this.player);
+      for (const p of this.projectiles.getChildren() as Projectile[]) p.step();
       this.checkSwordHits();
     };
     world.on(Phaser.Physics.Arcade.Events.WORLD_STEP, onStep);
@@ -342,19 +356,72 @@ export class GameScene extends Phaser.Scene {
     playSfx(this, SfxKey.CHECKPOINT);
   }
 
+  private createEnemy(spawn: EnemySpawn): Enemy {
+    switch (spawn.kind) {
+      case "jumper":
+        return new Jumper(this, spawn);
+      case "shooter":
+        return new Shooter(this, spawn, (x, y, dir, speed, damage) => {
+          const rock = new Projectile(this, x, y, dir, speed, damage);
+          this.projectiles.add(rock);
+          rock.launch();
+          playSfx(this, SfxKey.SHOOT);
+        });
+      default:
+        return new Walker(this, spawn);
+    }
+  }
+
+  private onProjectileHit(rock: Projectile): void {
+    if (this.phase !== "playing" || !rock.active) return;
+    if (!this.player.hurt(rock.x)) return; // invincible: the rock passes through
+    rock.destroy();
+    const outcome = this.health.damage(rock.damage);
+    if (outcome === "hurt") playSfx(this, SfxKey.HURT);
+    this.handleOutcome(outcome);
+  }
+
+  /**
+   * Sword for this level (CB-5). On the level where an upgrade starts, the
+   * HUD announces it and the save remembers the highest sword level.
+   */
+  private equipSword(): void {
+    const sword = swordForLevel(this.levelNumber);
+    this.player.setSword(sword);
+    if (this.levelNumber > 1 && sword.fromLevel === this.levelNumber) {
+      this.toast = `SWORD UP!\n${sword.label}`;
+      playSfx(this, SfxKey.SWORD_UPGRADE);
+    }
+    if (!this.testLevel) recordProgress({ weaponLevel: sword.swordLevel });
+  }
+
+  /** The HUD takes this message once and shows it. */
+  consumeToast(): string | undefined {
+    const t = this.toast;
+    this.toast = undefined;
+    return t;
+  }
+
   /** Sword against enemies, once per physics step while the hitbox is active (CB-2). */
   private checkSwordHits(): void {
     const box = this.player.swordBox;
     this.drawSwordDebug(box);
     if (!box || this.phase !== "playing") return;
-    for (const w of [...this.walkers]) {
+    // Knock rocks out of the air.
+    for (const p of [...(this.projectiles.getChildren() as Projectile[])]) {
+      const b = p.body;
+      if (!overlaps(box, { x: b.left, y: b.top, width: b.width, height: b.height })) continue;
+      p.destroy();
+      playSfx(this, SfxKey.ENEMY_HIT);
+    }
+    for (const w of [...this.enemies]) {
       const b = w.body;
       if (!overlaps(box, { x: b.left, y: b.top, width: b.width, height: b.height })) continue;
-      const result = w.swordHit(this.player.swing, SWORD.DAMAGE, this.player.x);
+      const result = w.swordHit(this.player.swing, this.player.swordDamage, this.player.x);
       if (!result) continue;
       playSfx(this, SfxKey.ENEMY_HIT);
       if (result === "defeated") {
-        this.walkers = this.walkers.filter((x) => x !== w);
+        this.enemies = this.enemies.filter((x) => x !== w);
         this.stomps++;
         this.dust?.explode(JUICE.DUST_LAND, w.x, w.y - 4);
       }
@@ -374,7 +441,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Touching an enemy: stomp it from above, otherwise take damage (CB-1, CB-3). */
-  private onEnemyContact(walker: Walker): void {
+  private onEnemyContact(walker: Enemy): void {
     if (this.phase !== "playing" || !walker.alive) return;
     const pb = this.player.body;
     const stomped = isStomp({
@@ -384,7 +451,7 @@ export class GameScene extends Phaser.Scene {
     });
     if (stomped) {
       walker.stomp();
-      this.walkers = this.walkers.filter((w) => w !== walker);
+      this.enemies = this.enemies.filter((w) => w !== walker);
       this.player.bounce();
       this.stomps++;
       this.dust?.explode(JUICE.DUST_LAND, walker.x, walker.y - 1);
@@ -393,7 +460,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (!this.player.hurt(walker.x)) return; // invincible (i-frames)
     walker.knockback(this.player.x);
-    const outcome = this.health.damage(ENEMY.CONTACT_DAMAGE);
+    const outcome = this.health.damage(walker.damage);
     if (outcome === "hurt") playSfx(this, SfxKey.HURT);
     this.handleOutcome(outcome);
   }

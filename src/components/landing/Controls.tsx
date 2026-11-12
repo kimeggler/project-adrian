@@ -31,8 +31,8 @@ export default function Controls() {
         and tablets, on-screen buttons appear.
       </p>
       <p className="mt-3 text-center text-[8px] leading-relaxed text-[#cbdbfc]">
-        Hold jump to jump higher. Stomp slimes or hit them twice with your sword. Collect coins,
-        dodge spikes, reach the flag!
+        Hold jump to jump higher. Stomp enemies or hit them with your sword, which gets stronger
+        in later levels. Knock rocks out of the air! Collect coins, dodge spikes, reach the flag!
       </p>
     </section>
   );
