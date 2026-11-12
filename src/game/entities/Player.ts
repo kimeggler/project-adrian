@@ -71,8 +71,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this.invincibleMs > 0;
   }
 
+  /**
+   * Standing on solid tiles. Only `blocked` counts: Arcade also sets
+   * `touching` for overlaps (coins, flags, checkpoints), which would let the
+   * player jump off a coin in mid-air. Moving platforms (P2) will need their
+   * own check here.
+   */
   get grounded(): boolean {
-    return this.body.blocked.down || this.body.touching.down;
+    return this.body.blocked.down;
   }
 
   /** Advance the controller by one fixed physics step (`dt` in seconds). */

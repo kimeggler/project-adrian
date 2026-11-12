@@ -1,5 +1,5 @@
 import type * as Phaser from "phaser";
-import { CHECKPOINT, FLAG, PLACEHOLDER_COLORS, PLAYER, TILE } from "./config";
+import { CHECKPOINT, COIN, FLAG, PLACEHOLDER_COLORS, PLAYER, TILE } from "./config";
 import { TileId, TILESET_SIZE } from "./tiles";
 
 export const TextureKey = {
@@ -11,6 +11,7 @@ export const TextureKey = {
   SPIKES: "spikes",
   HEART_FULL: "heart-full",
   HEART_EMPTY: "heart-empty",
+  COIN: "coin",
 } as const;
 
 /**
@@ -26,6 +27,19 @@ export function createPlaceholderTextures(scene: Phaser.Scene): void {
   createSpikeTexture(scene);
   createHeartTexture(scene, TextureKey.HEART_FULL, PLACEHOLDER_COLORS.HEART);
   createHeartTexture(scene, TextureKey.HEART_EMPTY, PLACEHOLDER_COLORS.HEART_EMPTY);
+  createCoinTexture(scene);
+}
+
+function createCoinTexture(scene: Phaser.Scene): void {
+  const tex = scene.textures.createCanvas(TextureKey.COIN, COIN.SIZE, COIN.SIZE);
+  if (!tex) return;
+  const ctx = tex.getContext();
+  const disc = [" #### ", "######", "######", "######", "######", " #### "];
+  drawPattern(ctx, disc, PLACEHOLDER_COLORS.COIN_SHADE, 2, 1); // shadow edge
+  drawPattern(ctx, disc, PLACEHOLDER_COLORS.COIN, 1, 1);
+  ctx.fillStyle = PLACEHOLDER_COLORS.COIN_SHADE;
+  ctx.fillRect(4, 3, 1, 3); // stamp line
+  tex.refresh();
 }
 
 /** Draw a pixel pattern: one string per row, "#" = filled. */

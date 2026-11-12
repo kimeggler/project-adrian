@@ -20,12 +20,14 @@ const HUD_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
 
 /**
  * HUD overlay on top of GameScene with its own fixed camera.
- * Phase 3: hearts, lives and level number. Coins and score come in phase 4.
+ * Hearts, lives, coins, score and level number (GP-4).
  * Also hosts the F1 debug overlay.
  */
 export class UIScene extends Phaser.Scene {
   private hearts: Phaser.GameObjects.Image[] = [];
   private livesText!: Phaser.GameObjects.Text;
+  private coinText!: Phaser.GameObjects.Text;
+  private scoreText!: Phaser.GameObjects.Text;
   private levelText!: Phaser.GameObjects.Text;
   private last?: HudState;
 
@@ -41,6 +43,9 @@ export class UIScene extends Phaser.Scene {
     this.last = undefined;
 
     this.livesText = this.add.text(0, 2, "", HUD_STYLE);
+    this.add.image(76, 3, TextureKey.COIN).setOrigin(0);
+    this.coinText = this.add.text(86, 2, "", HUD_STYLE);
+    this.scoreText = this.add.text(GAME_WIDTH / 2 + 30, 2, "", HUD_STYLE).setOrigin(0.5, 0);
     this.levelText = this.add.text(GAME_WIDTH - 3, 2, "", HUD_STYLE).setOrigin(1, 0);
 
     this.debugText = this.add
@@ -67,7 +72,9 @@ export class UIScene extends Phaser.Scene {
       prev.hearts === hud.hearts &&
       prev.maxHearts === hud.maxHearts &&
       prev.lives === hud.lives &&
-      prev.level === hud.level
+      prev.level === hud.level &&
+      prev.coins === hud.coins &&
+      prev.score === hud.score
     ) {
       return;
     }
@@ -83,6 +90,8 @@ export class UIScene extends Phaser.Scene {
     );
 
     this.livesText.setX(4 + hud.maxHearts * 9 + 4).setText(`x${hud.lives}`);
+    this.coinText.setText(`x${hud.coins}`);
+    this.scoreText.setText(String(hud.score).padStart(6, "0"));
     this.levelText.setText(`LV ${hud.level}`);
   }
 

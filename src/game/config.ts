@@ -101,6 +101,79 @@ export const WORLD = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Level generator (REQUIREMENTS_1.md §3.3)
+// Gap and step limits are NOT here: they are derived from PHYSICS above
+// (maxGapTiles / maxStepTiles) so physics changes can't break levels.
+// ---------------------------------------------------------------------------
+
+export const LEVELGEN = {
+  /** Ground height range in tiles (from the bottom of the level). */
+  MIN_GROUND: 1,
+  MAX_GROUND: 5,
+  /** Ground height of the spawn and flag areas. */
+  START_GROUND: 2,
+  /** Free tiles required above any surface the player can land on. */
+  MIN_HEADROOM: 3,
+  /** Retry with seed + n up to this many times if a level is unbeatable. */
+  MAX_ATTEMPTS: 20,
+  /** Seeds picked at random are in [1, MAX_RANDOM_SEED]. */
+  MAX_RANDOM_SEED: 999_999,
+} as const;
+
+/**
+ * Difficulty per level number (1-based). Levels beyond the table use the
+ * last row. All difficulty scaling lives here (CB-7 will add enemy columns).
+ *
+ * Weights are relative chances of picking each segment type.
+ * `maxGap` / `maxSpikes` are further capped by the physics-derived limits.
+ */
+export interface DifficultyRow {
+  flat: number;
+  step: number;
+  gap: number;
+  spikes: number;
+  obstacle: number;
+  platform: number;
+  /** Widest gap in tiles (before the physics cap). */
+  maxGap: number;
+  /** Most spikes in a row. */
+  maxSpikes: number;
+  /** Chance that a flat stretch gets a row of coins. */
+  coinChance: number;
+}
+
+export const DIFFICULTY: readonly DifficultyRow[] = [
+  { flat: 4, step: 3, gap: 2, spikes: 1, obstacle: 2, platform: 0, maxGap: 2, maxSpikes: 1, coinChance: 0.5 },
+  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 1, maxGap: 2, maxSpikes: 1, coinChance: 0.5 },
+  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.5 },
+  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.45 },
+  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4 },
+  { flat: 1, step: 3, gap: 5, spikes: 4, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4 },
+];
+
+export function difficultyFor(level: number): DifficultyRow {
+  const i = Math.min(Math.max(1, Math.floor(level)), DIFFICULTY.length) - 1;
+  return DIFFICULTY[i];
+}
+
+// ---------------------------------------------------------------------------
+// Coins and score (GP-3)
+// ---------------------------------------------------------------------------
+
+export const SCORE = {
+  COIN_POINTS: 10,
+  /** Time bonus when finishing instantly; falls linearly to 0 at par time. */
+  TIME_BONUS_MAX: 500,
+  /** Par time = level width / run speed × this factor. */
+  PAR_TIME_FACTOR: 2,
+} as const;
+
+export const COIN = {
+  SIZE: 8,
+  HITBOX: 6,
+} as const;
+
+// ---------------------------------------------------------------------------
 // Health, damage and respawn (GP-1)
 // ---------------------------------------------------------------------------
 
@@ -176,6 +249,8 @@ export const PLACEHOLDER_COLORS = {
   SPIKE_SHADE: "#847e87",
   HEART: "#ac3232",
   HEART_EMPTY: "#45283c",
+  COIN: "#fbf236",
+  COIN_SHADE: "#df7126",
   PLAYER: {
     idle: "#d9a066",
     run: "#df7126",

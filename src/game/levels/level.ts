@@ -18,4 +18,6 @@ export interface Level {
   spikes: Point[];
   /** Checkpoint flags; the player respawns at the last one touched (WO-8). */
   checkpoints: Point[];
+  /** Coins, by center point (GP-3). */
+  coins: Point[];
 }

@@ -19,24 +19,26 @@ export class LevelCompleteScene extends Phaser.Scene {
   }
 
   create(): void {
-    const { level, timeMs, coins, score } = this.result;
+    const { level, seed, timeMs, coins, coinsTotal, timeBonus, score } = this.result;
     const cx = addOverlay(this, "LEVEL COMPLETE!");
 
     const rows: [string, string][] = [
       ["Level", String(level)],
+      ["Seed", String(seed)],
       ["Time", formatTime(timeMs)],
-      ["Coins", String(coins)],
+      ["Coins", `${coins}/${coinsTotal}`],
+      ["Time bonus", `+${timeBonus}`],
       ["Score", String(score)],
     ];
     rows.forEach(([label, value], i) => {
-      const y = 42 + i * 12;
-      this.add.text(cx - 44, y, label, UI.TEXT);
-      this.add.text(cx + 44, y, value, UI.TEXT).setOrigin(1, 0);
+      const y = 36 + i * 10;
+      this.add.text(cx - 60, y, label, UI.TEXT);
+      this.add.text(cx + 60, y, value, UI.TEXT).setOrigin(1, 0);
     });
 
     const game = this.scene.get(SceneKey.GAME) as GameScene;
     new Menu(this, cx, 106, [
-      { label: "Next level", action: () => game.startLevel(level + 1) },
+      { label: "Next level", action: () => game.nextLevel(score) },
     ]);
   }
 }

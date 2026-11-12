@@ -14,8 +14,12 @@ export class GameOverScene extends Phaser.Scene {
     const game = this.scene.get(SceneKey.GAME) as GameScene;
     const cx = addOverlay(this, "GAME OVER", "#d95763");
 
+    const { level, seed, score } = game.hud;
     this.add
-      .text(cx, 44, `You reached level ${game.hud.level}`, UI.TEXT)
+      .text(cx, 40, `You reached level ${level}`, UI.TEXT)
+      .setOrigin(0.5);
+    this.add
+      .text(cx, 52, `Score ${score} · Seed ${seed}`, UI.TEXT)
       .setOrigin(0.5);
 
     new Menu(this, cx, 76, [

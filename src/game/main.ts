@@ -6,12 +6,14 @@ import { GameScene } from "./scenes/GameScene";
 import { LevelCompleteScene } from "./scenes/LevelCompleteScene";
 import { PauseScene } from "./scenes/PauseScene";
 import { UIScene } from "./scenes/UIScene";
+import { START_DATA_KEY } from "./events";
+import type { LevelStartData } from "./types";
 
 /**
  * Creates the Phaser game inside `parent`.
  * Only call this in the browser (never during SSR).
  */
-export function createGame(parent: HTMLElement): Phaser.Game {
+export function createGame(parent: HTMLElement, start: LevelStartData): Phaser.Game {
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
@@ -47,6 +49,7 @@ export function createGame(parent: HTMLElement): Phaser.Game {
     ],
   });
 
+  game.registry.set(START_DATA_KEY, start);
   fitIntegerZoom(game, parent);
   return game;
 }

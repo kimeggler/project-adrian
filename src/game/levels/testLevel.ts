@@ -73,5 +73,6 @@ export function buildTestLevel(): Level {
     flag: onGround(flagCol),
     spikes: [39, 40, 60, 83].map(onGround),
     checkpoints: [onGround(49)],
+    coins: [],
   };
 }

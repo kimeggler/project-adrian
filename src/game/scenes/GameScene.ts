@@ -1,11 +1,14 @@
 import * as Phaser from "phaser";
-import { CAMERA, CHECKPOINT, FLAG, HEALTH, SPIKES, TILE, WORLD } from "../config";
+import { CAMERA, CHECKPOINT, COIN, FLAG, HEALTH, SPIKES, TILE, WORLD } from "../config";
 import { Player } from "../entities/Player";
 import { GameEvent } from "../events";
+import { generateLevel } from "../levelgen/generator";
+import { nextSeed } from "../levelgen/seed";
 import type { Level, Point } from "../levels/level";
 import { buildTestLevel } from "../levels/testLevel";
 import { Health, type DamageOutcome } from "../systems/Health";
 import { PlayerInput } from "../systems/Input";
+import { coinPoints, timeBonus } from "../systems/Score";
 import { TextureKey } from "../textures";
 import { SOLID_TILES } from "../tiles";
 import type { HudState, LevelResult, LevelStartData } from "../types";
@@ -18,7 +21,13 @@ export class GameScene extends Phaser.Scene {
   player!: Player;
   private level!: Level;
   private levelNumber = 1;
+  private seed = 0;
+  private testLevel = false;
   private health = new Health();
+  /** Run score when this level began. */
+  private scoreAtStart = 0;
+  /** Coins collected in this level. */
+  private coins = 0;
   /** Lives when this level began; "Restart level" goes back to this. */
   private livesAtStart: number = HEALTH.START_LIVES;
   private respawnPoint!: Point;
@@ -32,6 +41,10 @@ export class GameScene extends Phaser.Scene {
 
   init(data: Partial<LevelStartData>): void {
     this.levelNumber = data.level ?? 1;
+    this.seed = data.seed ?? 1;
+    this.testLevel = data.testLevel ?? false;
+    this.scoreAtStart = data.score ?? 0;
+    this.coins = 0;
     this.livesAtStart = data.lives ?? HEALTH.START_LIVES;
     this.health = new Health(this.livesAtStart);
     this.elapsedMs = 0;
@@ -39,7 +52,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.level = buildTestLevel();
+    this.level = this.testLevel
+      ? buildTestLevel()
+      : generateLevel(this.seed, this.levelNumber).level;
+    this.game.events.emit(GameEvent.LEVEL_STARTED, {
+      seed: this.seed,
+      level: this.levelNumber,
+      testLevel: this.testLevel,
+    });
     const { data, widthTiles, heightTiles, spawn, flag } = this.level;
     this.respawnPoint = spawn;
 
@@ -64,6 +84,13 @@ export class GameScene extends Phaser.Scene {
       );
     }
 
+    const coins = this.physics.add.staticGroup();
+    for (const p of this.level.coins) {
+      const coin = this.physics.add.staticImage(p.x, p.y, TextureKey.COIN);
+      coin.body.setSize(COIN.HITBOX, COIN.HITBOX);
+      coins.add(coin);
+    }
+
     // --- Player --------------------------------------------------------------
     const input = new PlayerInput(this);
     this.player = new Player(this, spawn.x, spawn.y, input);
@@ -74,6 +101,9 @@ export class GameScene extends Phaser.Scene {
     );
     this.physics.add.overlap(this.player, checkpoints, (_p, cp) =>
       this.onCheckpoint(cp as Phaser.Physics.Arcade.Image),
+    );
+    this.physics.add.overlap(this.player, coins, (_p, coin) =>
+      this.onCoin(coin as Phaser.Physics.Arcade.Image),
     );
 
     // Run the player controller once per fixed physics step.
@@ -123,25 +153,34 @@ export class GameScene extends Phaser.Scene {
   get hud(): HudState {
     return {
       level: this.levelNumber,
+      seed: this.seed,
       hearts: this.health.hearts,
       maxHearts: this.health.maxHearts,
       lives: this.health.lives,
+      coins: this.coins,
+      score: this.currentScore,
     };
   }
 
-  /** Go to the given level, keeping the current lives ("Next level"). */
-  startLevel(level: number): void {
-    this.restartWith({ level, lives: this.health.lives });
+  /** Go to the next level, keeping lives and score ("Next level"). */
+  nextLevel(totalScore: number): void {
+    this.restartWith({
+      level: this.levelNumber + 1,
+      seed: nextSeed(this.seed),
+      lives: this.health.lives,
+      score: totalScore,
+      testLevel: this.testLevel,
+    });
   }
 
-  /** Restart this level with the lives it started with (GP-6). */
+  /** Restart this level (same seed) as it began: lives and score (GP-6). */
   restartLevel(): void {
-    this.restartWith({ level: this.levelNumber, lives: this.livesAtStart });
+    this.restartWith({ ...this.sameLevel(), lives: this.livesAtStart });
   }
 
-  /** Retry this level with full lives (game over → "Retry level"). */
+  /** Retry this level (same seed) with full lives (game over → "Retry level"). */
   retryLevel(): void {
-    this.restartWith({ level: this.levelNumber, lives: HEALTH.START_LIVES });
+    this.restartWith({ ...this.sameLevel(), lives: HEALTH.START_LIVES });
   }
 
   resumeGame(): void {
@@ -164,6 +203,20 @@ export class GameScene extends Phaser.Scene {
     return img;
   }
 
+  /** Run score so far: earlier levels plus coins in this level. */
+  private get currentScore(): number {
+    return this.scoreAtStart + coinPoints(this.coins);
+  }
+
+  private sameLevel(): LevelStartData {
+    return {
+      level: this.levelNumber,
+      seed: this.seed,
+      score: this.scoreAtStart,
+      testLevel: this.testLevel,
+    };
+  }
+
   private restartWith(data: LevelStartData): void {
     this.scene.restart(data);
   }
@@ -184,6 +237,12 @@ export class GameScene extends Phaser.Scene {
     if (cp.getData("active")) return;
     cp.setData("active", true).setTexture(TextureKey.CHECKPOINT_ON);
     this.respawnPoint = { x: cp.x, y: cp.y };
+  }
+
+  private onCoin(coin: Phaser.Physics.Arcade.Image): void {
+    if (this.phase !== "playing") return;
+    coin.disableBody(true, true);
+    this.coins++;
   }
 
   private handleOutcome(outcome: DamageOutcome): void {
@@ -211,11 +270,15 @@ export class GameScene extends Phaser.Scene {
     this.physics.pause();
     this.player.body.setVelocity(0, 0);
 
+    const bonus = timeBonus(this.elapsedMs, this.level.widthTiles);
     const result: LevelResult = {
       level: this.levelNumber,
+      seed: this.seed,
       timeMs: this.elapsedMs,
-      coins: 0,
-      score: 0,
+      coins: this.coins,
+      coinsTotal: this.level.coins.length,
+      timeBonus: bonus,
+      score: this.currentScore + bonus,
     };
     this.scene.launch(SceneKey.LEVEL_COMPLETE, result);
   }

@@ -19,7 +19,7 @@ export class PauseScene extends Phaser.Scene {
     const cx = addOverlay(this, "PAUSED");
 
     this.add
-      .text(cx, 40, `Level ${game.hud.level}`, UI.TEXT)
+      .text(cx, 40, `Level ${game.hud.level} · Seed ${game.hud.seed}`, UI.TEXT)
       .setOrigin(0.5);
 
     new Menu(this, cx, 66, [
