@@ -9,6 +9,7 @@
  */
 import { CHARACTERS, DEFAULT_CHARACTER, isCharacterId, unlockedByLevel, type CharacterId } from "../characters";
 import { AUDIO, JUICE } from "../config";
+import { DEFAULT_WORLD, isWorldId, type WorldId } from "../worlds";
 
 export const SAVE_KEY = "little-knight:save";
 export const SAVE_VERSION = 1;
@@ -32,6 +33,8 @@ export interface SaveData {
   unlockedCharacters: CharacterId[];
   /** Hero picked on the landing page; always one of unlockedCharacters. */
   character: CharacterId;
+  /** World skin picked on the landing page. */
+  world: WorldId;
   /** For sword upgrades (P2). */
   weaponLevel: number;
 }
@@ -52,6 +55,7 @@ export function defaultSave(): SaveData {
     highestLevel: 0,
     unlockedCharacters: [DEFAULT_CHARACTER],
     character: DEFAULT_CHARACTER,
+    world: DEFAULT_WORLD,
     weaponLevel: 1,
   };
 }
@@ -88,6 +92,7 @@ export function sanitizeSave(raw: unknown): SaveData {
     unlockedCharacters,
     character:
       isCharacterId(r.character) && unlocked.has(r.character) ? r.character : d.character,
+    world: isWorldId(r.world) ? r.world : d.world,
     weaponLevel: int(r.weaponLevel, d.weaponLevel) || d.weaponLevel,
   };
 }
@@ -175,6 +180,11 @@ export function recordProgress({
 export function selectCharacter(id: CharacterId): void {
   if (!getSave().unlockedCharacters.includes(id)) return;
   updateSave((s) => ({ ...s, character: id }));
+}
+
+/** Pick the world skin for the next run. */
+export function selectWorld(id: WorldId): void {
+  updateSave((s) => ({ ...s, world: id }));
 }
 
 /** Subscribe to save changes (e.g. the landing page). Returns an unsubscribe function. */

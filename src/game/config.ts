@@ -14,8 +14,6 @@ export const TILE = 16;
 export const GAME_WIDTH = 256;
 export const GAME_HEIGHT = 144;
 
-/** Background color of the canvas (and letterbox). */
-export const BACKGROUND_COLOR = "#5fcde4";
 export const LETTERBOX_COLOR = "#000000";
 
 // ---------------------------------------------------------------------------

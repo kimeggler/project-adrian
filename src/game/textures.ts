@@ -1,5 +1,5 @@
 import type * as Phaser from "phaser";
-import { drawClouds, drawHills, drawMountains, drawSky, LAYER_WIDTH } from "./art/backgrounds";
+import { LAYER_WIDTH } from "./art/backgrounds";
 import { paintSprite, spriteSize } from "./art/paint";
 import {
   CHECKPOINT_OFF,
@@ -28,7 +28,7 @@ import {
   SPIKES,
   type Sprite,
 } from "./art/sprites";
-import { drawBlock, drawGround, drawGroundTop, drawWall } from "./art/tiles";
+import type { World } from "./worlds";
 import { CHARACTERS, type CharacterId } from "./characters";
 import { COIN, ENEMY, GAME_HEIGHT, POWERUP, TILE, TOUCH } from "./config";
 import { TileId, TILESET_SIZE } from "./tiles";
@@ -86,9 +86,12 @@ export const TOTEM_FRAME = { IDLE: 0, CHARGE: 1 } as const;
 /** Frame rates per animation (frames per second). */
 const ANIM_FPS = { idle: 3, run: 12, coin: 8 } as const;
 
-/** Draws every texture from the pixel-art data and registers animations. */
-export function createTextures(scene: Phaser.Scene): void {
-  createTileset(scene);
+/**
+ * Draws every texture from the pixel-art data and registers animations.
+ * Tiles and backgrounds come from the selected world skin.
+ */
+export function createTextures(scene: Phaser.Scene, world: World): void {
+  createTileset(scene, world);
   for (const c of CHARACTERS) createHero(scene, c.id, heroFrames(c.look));
   createSheet(scene, TextureKey.COIN, COIN_FRAMES, COIN.SIZE);
   createSheet(scene, TextureKey.SLIME, [...SLIME_FRAMES.walk, ...SLIME_FRAMES.squashed], ENEMY.SIZE);
@@ -112,10 +115,10 @@ export function createTextures(scene: Phaser.Scene): void {
   ] as const) {
     createImage(scene, key, sprite);
   }
-  createLayer(scene, TextureKey.BG_SKY, drawSky);
-  createLayer(scene, TextureKey.BG_CLOUDS, drawClouds);
-  createLayer(scene, TextureKey.BG_MOUNTAINS, drawMountains);
-  createLayer(scene, TextureKey.BG_HILLS, drawHills);
+  createLayer(scene, TextureKey.BG_SKY, world.layers.sky);
+  createLayer(scene, TextureKey.BG_CLOUDS, world.layers.far);
+  createLayer(scene, TextureKey.BG_MOUNTAINS, world.layers.mid);
+  createLayer(scene, TextureKey.BG_HILLS, world.layers.near);
   createButton(scene, TextureKey.BTN_LEFT, ICON_LEFT, TOUCH.BUTTON_SIZE);
   createButton(scene, TextureKey.BTN_RIGHT, ICON_RIGHT, TOUCH.BUTTON_SIZE);
   createButton(scene, TextureKey.BTN_JUMP, ICON_JUMP, TOUCH.BUTTON_SIZE);
@@ -180,14 +183,14 @@ function createButton(scene: Phaser.Scene, key: string, icon: Sprite, size: numb
   tex.refresh();
 }
 
-function createTileset(scene: Phaser.Scene): void {
+function createTileset(scene: Phaser.Scene, { tiles }: World): void {
   const tex = scene.textures.createCanvas(TextureKey.TILES, TILE * TILESET_SIZE, TILE);
   if (!tex) return;
   const ctx = tex.getContext();
-  drawGroundTop(ctx, TileId.GROUND_TOP * TILE);
-  drawGround(ctx, TileId.GROUND * TILE);
-  drawBlock(ctx, TileId.BLOCK * TILE);
-  drawWall(ctx, TileId.WALL * TILE);
+  tiles.groundTop(ctx, TileId.GROUND_TOP * TILE);
+  tiles.ground(ctx, TileId.GROUND * TILE);
+  tiles.block(ctx, TileId.BLOCK * TILE);
+  tiles.wall(ctx, TileId.WALL * TILE);
   tex.refresh();
 }
 

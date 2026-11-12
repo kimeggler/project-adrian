@@ -9,6 +9,7 @@ import {
   SAVE_VERSION,
   sanitizeSave,
   selectCharacter,
+  selectWorld,
   writeSave,
   type StorageLike,
 } from "./Save";
@@ -93,6 +94,21 @@ describe("local save", () => {
       "knight",
       "paladin",
     ]);
+  });
+});
+
+describe("world skin", () => {
+  beforeEach(() => resetSaveCache());
+
+  it("defaults to the meadow and drops unknown worlds", () => {
+    expect(defaultSave().world).toBe("meadow");
+    expect(sanitizeSave({ world: "dungeon" }).world).toBe("dungeon");
+    expect(sanitizeSave({ world: "moon" }).world).toBe("meadow");
+  });
+
+  it("stores the picked world", () => {
+    selectWorld("dungeon");
+    expect(getSave().world).toBe("dungeon");
   });
 });
 

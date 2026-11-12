@@ -16,6 +16,8 @@ No third-party or copyrighted game assets (Minecraft, Nintendo, etc.) may be use
 | Shield bubble | Drawn with code in `src/game/textures.ts` | Original work, part of this project |
 | Tiles (grass, dirt, stone block, castle wall) | Drawn with code in `src/game/art/tiles.ts` | Original work, part of this project |
 | Parallax background (sky, clouds, mountains, hills) | Drawn with code in `src/game/art/backgrounds.ts` | Original work, part of this project |
+| Dungeon world: flagstone floor, stone bricks, crate, dungeon wall | Drawn with code in `src/game/art/tiles.ts` | Original work, part of this project |
+| Dungeon background (darkness, arches, torches, chains, pillars) | Drawn with code in `src/game/art/backgrounds.ts` | Original work, part of this project |
 
 The colors are picked from the widely used DawnBringer 32 palette (a list of
 colors, not artwork).

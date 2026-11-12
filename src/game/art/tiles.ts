@@ -66,3 +66,100 @@ export function drawWall(ctx: Ctx, ox: number): void {
   brick(4, 8, 8);
   brick(13, 8, 3);
 }
+
+/** One world's four tiles (same slots as TileId). */
+export interface TileArt {
+  groundTop: (ctx: Ctx, ox: number) => void;
+  ground: (ctx: Ctx, ox: number) => void;
+  block: (ctx: Ctx, ox: number) => void;
+  wall: (ctx: Ctx, ox: number) => void;
+}
+
+export const MEADOW_TILES: TileArt = {
+  groundTop: drawGroundTop,
+  ground: drawGround,
+  block: drawBlock,
+  wall: drawWall,
+};
+
+// ---------------------------------------------------------------------------
+// Dungeon world
+// ---------------------------------------------------------------------------
+
+const DUNGEON = {
+  mortar: "#222034",
+  stone: "#45444f",
+  stoneLight: "#595652",
+  edge: "#847e87",
+  edgeLight: "#9badb7",
+  moss: "#4b692f",
+  mossLight: "#6abe30",
+  brick: "#45283c",
+  brickLight: "#76428a",
+  wood: "#8f563b",
+  woodDark: "#663931",
+  iron: "#847e87",
+} as const;
+
+/** Offset stone bricks with dark mortar (rows of 8 px, tiles seamlessly). */
+function stoneBricks(ctx: Ctx, ox: number, color: string): void {
+  px(ctx, color, ox, 0, T, T);
+  px(ctx, DUNGEON.mortar, ox, 7, T, 1);
+  px(ctx, DUNGEON.mortar, ox, 15, T, 1);
+  px(ctx, DUNGEON.mortar, ox + 5, 0, 1, 7);
+  px(ctx, DUNGEON.mortar, ox + 12, 8, 1, 7);
+  // Cracks and chips at fixed spots.
+  for (const [x, y] of [[9, 3], [10, 4], [2, 11], [14, 2], [7, 12]]) px(ctx, DUNGEON.mortar, ox + x, y);
+}
+
+/** Worn flagstone floor with moss on the walking edge. */
+export function drawDungeonFloor(ctx: Ctx, ox: number): void {
+  stoneBricks(ctx, ox, DUNGEON.stoneLight);
+  px(ctx, DUNGEON.edge, ox, 0, T, 2);
+  for (const x of [1, 4, 8, 11, 15]) px(ctx, DUNGEON.edgeLight, ox + x, 0);
+  // Moss creeping over the edge.
+  for (const [x, len] of [[2, 2], [3, 3], [9, 1], [10, 2], [13, 2]]) {
+    px(ctx, DUNGEON.moss, ox + x, 0, 1, len);
+  }
+  px(ctx, DUNGEON.mossLight, ox + 3, 0);
+  px(ctx, DUNGEON.mossLight, ox + 10, 0);
+}
+
+export function drawDungeonStone(ctx: Ctx, ox: number): void {
+  stoneBricks(ctx, ox, DUNGEON.stone);
+}
+
+/** Iron-bound wooden crate. */
+export function drawCrate(ctx: Ctx, ox: number): void {
+  px(ctx, DUNGEON.mortar, ox, 0, T, T);
+  px(ctx, DUNGEON.wood, ox + 1, 1, T - 2, T - 2);
+  for (const y of [5, 10]) px(ctx, DUNGEON.woodDark, ox + 1, y, T - 2, 1);
+  // Diagonal brace.
+  for (let i = 2; i < T - 2; i++) px(ctx, DUNGEON.woodDark, ox + i, T - 1 - i);
+  // Iron corners with rivets.
+  for (const [x, y] of [[1, 1], [12, 1], [1, 12], [12, 12]]) {
+    px(ctx, DUNGEON.iron, ox + x, y, 3, 3);
+    px(ctx, DUNGEON.mortar, ox + x + 1, y + 1);
+  }
+}
+
+/** Purple-grey dungeon bricks for the level walls. */
+export function drawDungeonWall(ctx: Ctx, ox: number): void {
+  px(ctx, DUNGEON.mortar, ox, 0, T, T);
+  const brick = (x: number, y: number, w: number) => {
+    px(ctx, DUNGEON.brick, ox + x, y, w, 7);
+    px(ctx, DUNGEON.brickLight, ox + x, y, w, 1);
+  };
+  brick(0, 0, 7);
+  brick(8, 0, 8);
+  brick(0, 8, 3);
+  brick(4, 8, 8);
+  brick(13, 8, 3);
+}
+
+export const DUNGEON_TILES: TileArt = {
+  groundTop: drawDungeonFloor,
+  ground: drawDungeonStone,
+  block: drawCrate,
+  wall: drawDungeonWall,
+};
