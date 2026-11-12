@@ -24,3 +24,9 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Pixel-perfect game canvas: integer scaling is done in src/game/main.ts. */
+.game-container canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
