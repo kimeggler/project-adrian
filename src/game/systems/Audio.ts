@@ -11,6 +11,7 @@ export const SfxKey = {
   CHECKPOINT: "checkpoint",
   LEVEL_COMPLETE: "levelComplete",
   MENU_SELECT: "menuSelect",
+  STOMP: "stomp",
 } as const;
 
 export type SfxKeyValue = (typeof SfxKey)[keyof typeof SfxKey];

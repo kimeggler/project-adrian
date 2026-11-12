@@ -14,10 +14,11 @@ import {
   KNIGHT_FRAMES,
   KNIGHT_SIZE,
   PALETTE,
+  SLIME_FRAMES,
   SPIKES,
   type Sprite,
 } from "./sprites";
-import { CHECKPOINT, COIN, FLAG as FLAG_SIZE, TILE } from "../config";
+import { CHECKPOINT, COIN, ENEMY, FLAG as FLAG_SIZE, TILE } from "../config";
 
 const sprites: Record<string, { sprite: Sprite; w: number; h: number }> = {
   spikes: { sprite: SPIKES, w: TILE, h: TILE },
@@ -35,6 +36,11 @@ const sprites: Record<string, { sprite: Sprite; w: number; h: number }> = {
 for (const [anim, frames] of Object.entries(KNIGHT_FRAMES)) {
   frames.forEach((sprite, i) => {
     sprites[`knight.${anim}.${i}`] = { sprite, w: KNIGHT_SIZE, h: KNIGHT_SIZE };
+  });
+}
+for (const [anim, frames] of Object.entries(SLIME_FRAMES)) {
+  frames.forEach((sprite, i) => {
+    sprites[`slime.${anim}.${i}`] = { sprite, w: ENEMY.SIZE, h: ENEMY.SIZE };
   });
 }
 COIN_FRAMES.forEach((sprite, i) => {

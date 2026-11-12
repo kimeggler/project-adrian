@@ -15,16 +15,18 @@ import {
   ICON_RIGHT,
   KNIGHT_FRAMES,
   KNIGHT_SIZE,
+  SLIME_FRAMES,
   SPIKES,
   type Sprite,
 } from "./art/sprites";
 import { drawBlock, drawGround, drawGroundTop, drawWall } from "./art/tiles";
-import { COIN, GAME_HEIGHT, TILE, TOUCH } from "./config";
+import { COIN, ENEMY, GAME_HEIGHT, TILE, TOUCH } from "./config";
 import { TileId, TILESET_SIZE } from "./tiles";
 
 export const TextureKey = {
   TILES: "tiles",
   PLAYER: "knight",
+  SLIME: "slime",
   FLAG: "flag",
   CHECKPOINT_OFF: "checkpoint-off",
   CHECKPOINT_ON: "checkpoint-on",
@@ -50,7 +52,11 @@ export const AnimKey = {
   KNIGHT_FALL: "knight-fall",
   KNIGHT_HURT: "knight-hurt",
   COIN_SPIN: "coin-spin",
+  SLIME_WALK: "slime-walk",
 } as const;
+
+/** Frame index of the squashed slime in the slime sheet. */
+export const SLIME_SQUASHED_FRAME = SLIME_FRAMES.walk.length;
 
 /** Frame rates per animation (frames per second). */
 const ANIM_FPS = { idle: 3, run: 12, coin: 8 } as const;
@@ -60,6 +66,7 @@ export function createTextures(scene: Phaser.Scene): void {
   createTileset(scene);
   createSheet(scene, TextureKey.PLAYER, Object.values(KNIGHT_FRAMES).flat(), KNIGHT_SIZE);
   createSheet(scene, TextureKey.COIN, COIN_FRAMES, COIN.SIZE);
+  createSheet(scene, TextureKey.SLIME, [...SLIME_FRAMES.walk, ...SLIME_FRAMES.squashed], ENEMY.SIZE);
   for (const [key, sprite] of [
     [TextureKey.FLAG, FLAG],
     [TextureKey.CHECKPOINT_OFF, CHECKPOINT_OFF],
@@ -154,6 +161,12 @@ function createAnimations(scene: Phaser.Scene): void {
   scene.anims.create({ key: AnimKey.KNIGHT_JUMP, frames: range(k.jump.length) });
   scene.anims.create({ key: AnimKey.KNIGHT_FALL, frames: range(k.fall.length) });
   scene.anims.create({ key: AnimKey.KNIGHT_HURT, frames: range(k.hurt.length) });
+  scene.anims.create({
+    key: AnimKey.SLIME_WALK,
+    frames: SLIME_FRAMES.walk.map((_, i) => ({ key: TextureKey.SLIME, frame: i })),
+    frameRate: ENEMY.WALK_FPS,
+    repeat: -1,
+  });
   scene.anims.create({
     key: AnimKey.COIN_SPIN,
     frames: COIN_FRAMES.map((_, i) => ({ key: TextureKey.COIN, frame: i })),

@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { HEALTH, JUICE, PHYSICS, PLAYER } from "../config";
+import { ENEMY, HEALTH, JUICE, PHYSICS, PLAYER } from "../config";
 import { AnimKey, TextureKey } from "../textures";
 import type { PlayerInput } from "../systems/Input";
 
@@ -92,7 +92,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.body.setMaxVelocity(10000, PHYSICS.MAX_FALL_SPEED);
     this.setVisible(false);
 
-    this.view = scene.add.sprite(x, y, TextureKey.PLAYER, 0).setOrigin(0.5, 1);
+    // Drawn above enemies and pickups.
+    this.view = scene.add.sprite(x, y, TextureKey.PLAYER, 0).setOrigin(0.5, 1).setDepth(10);
     this.view.play(STATE_ANIMS.idle);
     // POST_UPDATE runs after Arcade has moved the body for this frame.
     scene.events.on(Phaser.Scenes.Events.POST_UPDATE, this.syncView, this);
@@ -202,6 +203,20 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     if (dir !== 0) this.view.setFlipX(dir < 0);
     this.endStep(grounded);
+  }
+
+  /**
+   * Bounce off an enemy after stomping it. Holding jump bounces higher, and
+   * letting go early cuts the bounce like a normal jump.
+   */
+  bounce(): void {
+    const held = this.controls.jumpHeld;
+    this.body.setVelocityY(held ? ENEMY.STOMP_BOUNCE_HELD : ENEMY.STOMP_BOUNCE);
+    this.jumpCuttable = held;
+    this.coyoteMs = 0;
+    this.bufferMs = 0;
+    this.squash(JUICE.STRETCH);
+    this.updateState(false);
   }
 
   /**

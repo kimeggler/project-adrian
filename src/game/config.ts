@@ -140,15 +140,19 @@ export interface DifficultyRow {
   maxSpikes: number;
   /** Chance that a flat stretch gets a row of coins. */
   coinChance: number;
+  /** Chance that a suitable flat stretch gets a walker enemy (CB-1). */
+  enemyChance: number;
+  /** Walker speed in px/s (CB-7). */
+  walkerSpeed: number;
 }
 
 export const DIFFICULTY: readonly DifficultyRow[] = [
-  { flat: 4, step: 3, gap: 2, spikes: 1, obstacle: 2, platform: 0, maxGap: 2, maxSpikes: 1, coinChance: 0.5 },
-  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 1, maxGap: 2, maxSpikes: 1, coinChance: 0.5 },
-  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.5 },
-  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.45 },
-  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4 },
-  { flat: 1, step: 3, gap: 5, spikes: 4, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4 },
+  { flat: 4, step: 3, gap: 2, spikes: 1, obstacle: 2, platform: 0, maxGap: 2, maxSpikes: 1, coinChance: 0.5, enemyChance: 0.15, walkerSpeed: 24 },
+  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 1, maxGap: 2, maxSpikes: 1, coinChance: 0.5, enemyChance: 0.25, walkerSpeed: 26 },
+  { flat: 3, step: 3, gap: 3, spikes: 2, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.5, enemyChance: 0.35, walkerSpeed: 28 },
+  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 2, maxGap: 3, maxSpikes: 2, coinChance: 0.45, enemyChance: 0.4, walkerSpeed: 30 },
+  { flat: 2, step: 3, gap: 4, spikes: 3, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4, enemyChance: 0.45, walkerSpeed: 33 },
+  { flat: 1, step: 3, gap: 5, spikes: 4, obstacle: 2, platform: 3, maxGap: 3, maxSpikes: 2, coinChance: 0.4, enemyChance: 0.5, walkerSpeed: 36 },
 ];
 
 export function difficultyFor(level: number): DifficultyRow {
@@ -162,6 +166,8 @@ export function difficultyFor(level: number): DifficultyRow {
 
 export const SCORE = {
   COIN_POINTS: 10,
+  /** Points for stomping an enemy. */
+  ENEMY_POINTS: 50,
   /** Time bonus when finishing instantly; falls linearly to 0 at par time. */
   TIME_BONUS_MAX: 500,
   /** Par time = level width / run speed × this factor. */
@@ -257,6 +263,41 @@ export const GAMEPAD = {
   DPAD_LEFT: 14,
   DPAD_RIGHT: 15,
   STICK_DEADZONE: 0.35,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Enemies (CB-1, CB-3, CB-4) — Phase 7: walker
+// ---------------------------------------------------------------------------
+
+export const ENEMY = {
+  /** Sprite frame size (px). */
+  SIZE: 16,
+  /** Walker hitbox (px), bottom-centered. */
+  HITBOX_WIDTH: 12,
+  HITBOX_HEIGHT: 9,
+  /** Hearts lost when touching an enemy from the side or below. */
+  CONTACT_DAMAGE: 1,
+  /**
+   * A stomp counts if the player is falling and their feet were at most
+   * this far below the enemy's top on the previous physics step (px).
+   */
+  STOMP_TOLERANCE: 4,
+  /** Player bounce after a stomp (px/s); holding jump bounces higher. */
+  STOMP_BOUNCE: -200,
+  STOMP_BOUNCE_HELD: -300,
+  /** Enemy knockback when it hits the player (CB-3). */
+  KNOCKBACK_VX: 70,
+  KNOCKBACK_MS: 300,
+  /** How long the squashed enemy stays visible (ms). */
+  SQUASHED_MS: 400,
+  /** Placement: shortest flat stretch a walker patrols (tiles). */
+  MIN_PATROL_TILES: 5,
+  /** Longer stretches are split into patrol areas of at most this size. */
+  MAX_PATROL_TILES: 10,
+  /** Keep this many tiles free around the checkpoint. */
+  CHECKPOINT_CLEARANCE: 3,
+  /** Walk animation speed (frames per second). */
+  WALK_FPS: 4,
 } as const;
 
 export const SPIKES = {

@@ -74,5 +74,9 @@ export function buildTestLevel(): Level {
     spikes: [39, 40, 60, 83].map(onGround),
     checkpoints: [onGround(49)],
     coins: [],
+    // One walker under the low ceiling: tests stomping with little headroom.
+    enemies: [
+      { kind: "walker", x: 66 * TILE + TILE / 2, y: (H - 2) * TILE, minX: 63 * TILE, maxX: 71 * TILE, speed: 28 },
+    ],
   };
 }

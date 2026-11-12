@@ -40,6 +40,7 @@ const SOUNDS = {
   checkpoint: ["powerUp", 8, { p_env_decay: 0.2 }],
   levelComplete: ["powerUp", 42, { p_env_sustain: 0.35, p_env_decay: 0.4, p_arp_mod: 0.45, p_arp_speed: 0.55 }],
   menuSelect: ["blipSelect", 2, {}],
+  stomp: ["jump", 31, { p_base_freq: 0.22, p_freq_ramp: 0.3, p_env_sustain: 0.1, p_env_decay: 0.22 }],
 };
 
 const COMMON = { sound_vol: 0.25, sample_rate: 44100, sample_size: 16 };

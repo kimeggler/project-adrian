@@ -30,6 +30,9 @@ export const PALETTE: Readonly<Record<string, string>> = {
   d: "#663931", // dirt shade
   e: "#d9a066", // dirt pebble
   R: "#ac3232", // red
+  V: "#76428a", // slime
+  v: "#45283c", // slime shade
+  M: "#d77bba", // slime highlight
 };
 
 // ---------------------------------------------------------------------------
@@ -226,3 +229,50 @@ export const ICON_PAUSE: Sprite = [
   ".WW..WW.",
   "........",
 ];
+
+// ---------------------------------------------------------------------------
+// Walker enemy: a purple slime (16×16 frames, facing right)
+// ---------------------------------------------------------------------------
+
+const EMPTY_ROW = "................";
+
+export const SLIME_FRAMES = {
+  walk: [
+    [
+      ...Array<string>(5).fill(EMPTY_ROW),
+      "......OOOO......",
+      "....OOVVVVOO....",
+      "...OVVMMVVVVO...",
+      "..OVVMVVVVVVVO..",
+      "..OVVVVWOVWOVO..",
+      ".OVVVVVWOVWOVVO.",
+      ".OVVVVVVVVVVVVO.",
+      ".OVVVVVVVVVVVVO.",
+      ".OvVVVVVVVVVVvO.",
+      "..OvvvvvvvvvvO..",
+      "...OOOOOOOOOO...",
+    ],
+    [
+      ...Array<string>(6).fill(EMPTY_ROW),
+      "......OOOO......",
+      "...OOOVVVVOOO...",
+      "..OVVMMVVVVVVO..",
+      ".OVVMVVVVVVVVVO.",
+      ".OVVVVVWOVWOVVO.",
+      "OVVVVVVWOVWOVVVO",
+      "OVVVVVVVVVVVVVVO",
+      "OvVVVVVVVVVVVVvO",
+      ".OvvvvvvvvvvvvO.",
+      "..OOOOOOOOOOOO..",
+    ],
+  ],
+  squashed: [
+    [
+      ...Array<string>(12).fill(EMPTY_ROW),
+      "....OOOOOOOO....",
+      "..OOVVWVVWVVOO..",
+      ".OVVVVVVVVVVVVO.",
+      "OOOOOOOOOOOOOOOO",
+    ],
+  ],
+} as const;

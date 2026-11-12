@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ENEMY,
   LEVELGEN,
   maxGapTiles,
   maxStepTiles,
@@ -129,6 +130,42 @@ describe("level generator", () => {
     }
   }, SLOW);
 
+  it("places walkers only on free, flat patrol areas", () => {
+    const safe = WORLD.SAFE_ZONE_TILES;
+    const perLevel: number[][] = Array.from({ length: LEVELS }, () => []);
+    for (const { seed, level } of cases.slice(0, 300)) {
+      const lvl = generateLevel(seed, level).level;
+      const ground = groundHeights(lvl);
+      const w = lvl.widthTiles;
+      const spikeCols = new Set(lvl.spikes.map((s) => Math.floor(s.x / TILE)));
+      const checkpointCol = Math.floor(lvl.checkpoints[0].x / TILE);
+      perLevel[level - 1].push(lvl.enemies.length);
+
+      for (const e of lvl.enemies) {
+        const from = e.minX / TILE;
+        const to = e.maxX / TILE - 1;
+        expect(to - from + 1).toBeGreaterThanOrEqual(ENEMY.MIN_PATROL_TILES);
+        expect(e.x).toBeGreaterThan(e.minX);
+        expect(e.x).toBeLessThan(e.maxX);
+        expect(from).toBeGreaterThan(safe);
+        expect(to).toBeLessThan(w - 1 - safe);
+        const row = e.y / TILE; // surface row the walker stands on
+        for (let c = from; c <= to; c++) {
+          expect(lvl.heightTiles - ground[c], `ground at ${c}`).toBe(row);
+          expect(spikeCols.has(c)).toBe(false);
+          expect(Math.abs(c - checkpointCol)).toBeGreaterThan(ENEMY.CHECKPOINT_CLEARANCE);
+          for (let k = 1; k <= LEVELGEN.MIN_HEADROOM; k++) {
+            expect(lvl.data[row - k][c]).toBe(TileId.EMPTY);
+          }
+        }
+      }
+    }
+    const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    // Every level type has some enemies, and harder levels have more.
+    expect(avg(perLevel[0])).toBeGreaterThan(0.5);
+    expect(avg(perLevel[LEVELS - 1])).toBeGreaterThan(avg(perLevel[0]));
+  }, SLOW);
+
   it("places coins in free space only", () => {
     for (const { seed, level } of cases.slice(0, 100)) {
       const lvl = generateLevel(seed, level).level;
@@ -166,6 +203,7 @@ describe("reachability check", () => {
       spikes: [],
       checkpoints: [],
       coins: [],
+      enemies: [],
     };
   }
 

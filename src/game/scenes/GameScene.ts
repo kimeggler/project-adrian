@@ -8,12 +8,16 @@ import {
   GAME_WIDTH,
   GAMEPAD,
   HEALTH,
+  ENEMY,
   JUICE,
+  SCORE,
   SPIKES,
   TILE,
   WORLD,
 } from "../config";
 import { Player, PlayerEvent } from "../entities/Player";
+import { Walker } from "../entities/Walker";
+import { isStomp } from "../systems/Combat";
 import { GameEvent } from "../events";
 import { generateLevel } from "../levelgen/generator";
 import { nextSeed } from "../levelgen/seed";
@@ -43,6 +47,10 @@ export class GameScene extends Phaser.Scene {
   private scoreAtStart = 0;
   /** Coins collected in this level. */
   private coins = 0;
+  /** Enemies stomped in this level. */
+  private stomps = 0;
+  private walkers: Walker[] = [];
+  private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
   /** Lives when this level began; "Restart level" goes back to this. */
   private livesAtStart: number = HEALTH.START_LIVES;
   private respawnPoint!: Point;
@@ -60,6 +68,8 @@ export class GameScene extends Phaser.Scene {
     this.testLevel = data.testLevel ?? false;
     this.scoreAtStart = data.score ?? 0;
     this.coins = 0;
+    this.stomps = 0;
+    this.walkers = [];
     this.livesAtStart = data.lives ?? HEALTH.START_LIVES;
     this.health = new Health(this.livesAtStart);
     this.elapsedMs = 0;
@@ -122,6 +132,11 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, checkpoints, (_p, cp) =>
       this.onCheckpoint(cp as Phaser.Physics.Arcade.Image),
     );
+    // --- Enemies (phase 7) ------------------------------------------------------
+    this.walkers = this.level.enemies.map((spawn) => new Walker(this, spawn));
+    this.physics.add.collider(this.walkers, layer);
+    this.physics.add.overlap(this.player, this.walkers, (_p, w) => this.onEnemyContact(w as Walker));
+
     this.physics.add.overlap(this.player, coins, (_p, coin) =>
       this.onCoin(coin as Phaser.Physics.Arcade.Image),
     );
@@ -131,6 +146,7 @@ export class GameScene extends Phaser.Scene {
     const onStep = (dt: number) => {
       this.elapsedMs += dt * 1000;
       this.player.step(dt);
+      for (const w of this.walkers) w.step(dt);
     };
     world.on(Phaser.Physics.Arcade.Events.WORLD_STEP, onStep);
 
@@ -232,7 +248,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Run score so far: earlier levels plus coins in this level. */
   private get currentScore(): number {
-    return this.scoreAtStart + coinPoints(this.coins);
+    return this.scoreAtStart + coinPoints(this.coins) + this.stomps * SCORE.ENEMY_POINTS;
   }
 
   private sameLevel(): LevelStartData {
@@ -279,14 +295,14 @@ export class GameScene extends Phaser.Scene {
 
   /** Dust puffs (GF-1) and screen shake (GF-2), driven by player events. */
   private createJuice(): void {
-    const dust = this.add.particles(0, 0, TextureKey.DUST, {
+    const dust = (this.dust = this.add.particles(0, 0, TextureKey.DUST, {
       emitting: false,
       lifespan: { min: 200, max: 350 },
       speed: { min: 10, max: 35 },
       angle: { min: 200, max: 340 }, // upwards, spreading sideways
       gravityY: 40,
       alpha: { start: 1, end: 0 },
-    });
+    }));
     const p = this.player;
     p.on(PlayerEvent.JUMP, () => playSfx(this, SfxKey.JUMP));
     p.on(PlayerEvent.LAND, (impact: number) => {
@@ -319,6 +335,31 @@ export class GameScene extends Phaser.Scene {
     cp.setData("active", true).setTexture(TextureKey.CHECKPOINT_ON);
     this.respawnPoint = { x: cp.x, y: cp.y };
     playSfx(this, SfxKey.CHECKPOINT);
+  }
+
+  /** Touching an enemy: stomp it from above, otherwise take damage (CB-1, CB-3). */
+  private onEnemyContact(walker: Walker): void {
+    if (this.phase !== "playing" || !walker.alive) return;
+    const pb = this.player.body;
+    const stomped = isStomp({
+      playerPrevBottom: pb.prev.y + pb.height,
+      playerVy: pb.velocity.y,
+      enemyTop: walker.body.top,
+    });
+    if (stomped) {
+      walker.stomp();
+      this.walkers = this.walkers.filter((w) => w !== walker);
+      this.player.bounce();
+      this.stomps++;
+      this.dust?.explode(JUICE.DUST_LAND, walker.x, walker.y - 1);
+      playSfx(this, SfxKey.STOMP);
+      return;
+    }
+    if (!this.player.hurt(walker.x)) return; // invincible (i-frames)
+    walker.knockback(this.player.x);
+    const outcome = this.health.damage(ENEMY.CONTACT_DAMAGE);
+    if (outcome === "hurt") playSfx(this, SfxKey.HURT);
+    this.handleOutcome(outcome);
   }
 
   private onCoin(coin: Phaser.Physics.Arcade.Image): void {

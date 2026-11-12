@@ -7,6 +7,7 @@
  */
 import {
   difficultyFor,
+  ENEMY,
   LEVELGEN,
   maxGapTiles,
   maxStepTiles,
@@ -14,7 +15,7 @@ import {
   WORLD,
   type DifficultyRow,
 } from "../config";
-import type { Level, Point } from "../levels/level";
+import type { EnemySpawn, Level, Point } from "../levels/level";
 import { TileId, type LevelData } from "../tiles";
 import { checkReachability } from "./reachability";
 import { hash32, Rng } from "./rng";
@@ -74,7 +75,60 @@ interface Layout {
 /** Builds one level from a PRNG seed. Exported for tests. */
 export function buildLevel(rngSeed: number, difficulty: DifficultyRow): Level {
   const layout = buildLayout(new Rng(rngSeed), difficulty);
-  return toLevel(layout);
+  const level = toLevel(layout);
+  // Enemies use their own random stream, so adding them (phase 7) didn't
+  // change the terrain of any existing seed.
+  level.enemies = placeEnemies(level, layout, new Rng(hash32(rngSeed ^ 0x5eede11e)), difficulty);
+  return level;
+}
+
+/**
+ * Walkers patrol flat stretches of ground: no spikes, no obstacles, enough
+ * headroom to jump over or onto them, and away from the spawn, flag and
+ * checkpoint areas. They never leave their stretch, so they can't block a
+ * path the reachability check relies on: the player can always jump over
+ * a walker, or stomp it, on open flat ground.
+ */
+function placeEnemies(level: Level, layout: Layout, rng: Rng, diff: DifficultyRow): EnemySpawn[] {
+  const { ground, spikeCols, checkpointCol } = layout;
+  const spikes = new Set(spikeCols);
+  const free = (c: number) => {
+    const g = ground[c];
+    if (g <= 0 || spikes.has(c)) return false;
+    if (c <= SAFE || c >= W - 1 - SAFE) return false;
+    if (Math.abs(c - checkpointCol) <= ENEMY.CHECKPOINT_CLEARANCE) return false;
+    for (let k = 1; k <= LEVELGEN.MIN_HEADROOM; k++) {
+      if (level.data[surfaceRow(g) - k]?.[c] !== TileId.EMPTY) return false;
+    }
+    return true;
+  };
+
+  const enemies: EnemySpawn[] = [];
+  let c = 1;
+  while (c < W - 1) {
+    if (!free(c)) {
+      c++;
+      continue;
+    }
+    // A run of free columns at the same ground height.
+    let end = c;
+    while (end + 1 < W - 1 && free(end + 1) && ground[end + 1] === ground[c]) end++;
+    for (let s = c; s <= end; s += ENEMY.MAX_PATROL_TILES) {
+      const e = Math.min(end, s + ENEMY.MAX_PATROL_TILES - 1);
+      if (e - s + 1 < ENEMY.MIN_PATROL_TILES || !rng.chance(diff.enemyChance)) continue;
+      const col = rng.int(s + 1, e - 1);
+      enemies.push({
+        kind: "walker",
+        x: col * TILE + TILE / 2,
+        y: surfaceRow(ground[col]) * TILE,
+        minX: s * TILE,
+        maxX: (e + 1) * TILE,
+        speed: diff.walkerSpeed,
+      });
+    }
+    c = end + 1;
+  }
+  return enemies;
 }
 
 function buildLayout(rng: Rng, diff: DifficultyRow): Layout {
@@ -285,5 +339,6 @@ function toLevel(layout: Layout): Level {
     spikes: spikeCols.map(onGround),
     checkpoints: [onGround(checkpointCol)],
     coins: coinPoints,
+    enemies: [], // placed by placeEnemies()
   };
 }
