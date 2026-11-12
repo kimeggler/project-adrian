@@ -12,12 +12,13 @@ import {
   JUICE,
   SCORE,
   SPIKES,
+  SWORD,
   TILE,
   WORLD,
 } from "../config";
 import { Player, PlayerEvent } from "../entities/Player";
 import { Walker } from "../entities/Walker";
-import { isStomp } from "../systems/Combat";
+import { isStomp, overlaps, type Rect } from "../systems/Combat";
 import { GameEvent } from "../events";
 import { generateLevel } from "../levelgen/generator";
 import { nextSeed } from "../levelgen/seed";
@@ -47,10 +48,11 @@ export class GameScene extends Phaser.Scene {
   private scoreAtStart = 0;
   /** Coins collected in this level. */
   private coins = 0;
-  /** Enemies stomped in this level. */
+  /** Enemies defeated in this level (stomp or sword). */
   private stomps = 0;
   private walkers: Walker[] = [];
   private dust?: Phaser.GameObjects.Particles.ParticleEmitter;
+  private swordDebug?: Phaser.GameObjects.Graphics;
   /** Lives when this level began; "Restart level" goes back to this. */
   private livesAtStart: number = HEALTH.START_LIVES;
   private respawnPoint!: Point;
@@ -70,6 +72,7 @@ export class GameScene extends Phaser.Scene {
     this.coins = 0;
     this.stomps = 0;
     this.walkers = [];
+    this.swordDebug = undefined; // destroyed with the previous level's objects
     this.livesAtStart = data.lives ?? HEALTH.START_LIVES;
     this.health = new Health(this.livesAtStart);
     this.elapsedMs = 0;
@@ -147,6 +150,7 @@ export class GameScene extends Phaser.Scene {
       this.elapsedMs += dt * 1000;
       this.player.step(dt);
       for (const w of this.walkers) w.step(dt);
+      this.checkSwordHits();
     };
     world.on(Phaser.Physics.Arcade.Events.WORLD_STEP, onStep);
 
@@ -305,6 +309,7 @@ export class GameScene extends Phaser.Scene {
     }));
     const p = this.player;
     p.on(PlayerEvent.JUMP, () => playSfx(this, SfxKey.JUMP));
+    p.on(PlayerEvent.ATTACK, () => playSfx(this, SfxKey.SWORD_SWING));
     p.on(PlayerEvent.LAND, (impact: number) => {
       if (impact < JUICE.MIN_LAND_SPEED) return;
       dust.explode(JUICE.DUST_LAND, p.x, p.y - 1);
@@ -335,6 +340,37 @@ export class GameScene extends Phaser.Scene {
     cp.setData("active", true).setTexture(TextureKey.CHECKPOINT_ON);
     this.respawnPoint = { x: cp.x, y: cp.y };
     playSfx(this, SfxKey.CHECKPOINT);
+  }
+
+  /** Sword against enemies, once per physics step while the hitbox is active (CB-2). */
+  private checkSwordHits(): void {
+    const box = this.player.swordBox;
+    this.drawSwordDebug(box);
+    if (!box || this.phase !== "playing") return;
+    for (const w of [...this.walkers]) {
+      const b = w.body;
+      if (!overlaps(box, { x: b.left, y: b.top, width: b.width, height: b.height })) continue;
+      const result = w.swordHit(this.player.swing, SWORD.DAMAGE, this.player.x);
+      if (!result) continue;
+      playSfx(this, SfxKey.ENEMY_HIT);
+      if (result === "defeated") {
+        this.walkers = this.walkers.filter((x) => x !== w);
+        this.stomps++;
+        this.dust?.explode(JUICE.DUST_LAND, w.x, w.y - 4);
+      }
+    }
+  }
+
+  /** With F1 physics debug on, also outline the sword hitbox. */
+  private drawSwordDebug(box: Rect | null): void {
+    const world = this.physics.world;
+    if (!world.drawDebug || !world.debugGraphic) {
+      this.swordDebug?.clear();
+      return;
+    }
+    this.swordDebug ??= this.add.graphics().setDepth(1000);
+    this.swordDebug.clear();
+    if (box) this.swordDebug.lineStyle(1, 0xff0000).strokeRect(box.x, box.y, box.width, box.height);
   }
 
   /** Touching an enemy: stomp it from above, otherwise take damage (CB-1, CB-3). */

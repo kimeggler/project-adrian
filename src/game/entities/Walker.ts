@@ -1,13 +1,14 @@
 import * as Phaser from "phaser";
-import { ENEMY, PHYSICS } from "../config";
+import { ENEMY, PHYSICS, SWORD } from "../config";
 import type { EnemySpawn } from "../levels/level";
 import { AnimKey, SLIME_SQUASHED_FRAME, TextureKey } from "../textures";
 
 /**
  * Walker enemy (CB-4): walks back and forth and turns around at walls and at
  * the ends of its patrol area (which the generator puts at edges, steps,
- * spikes and obstacles). Can be stomped (CB-1) and is knocked back after
- * hitting the player (CB-3).
+ * spikes and obstacles). Can be stomped (CB-1) or hit with the sword (CB-2,
+ * ENEMY.WALKER_HP hits), and is knocked back by hits and after hitting the
+ * player (CB-3).
  *
  * Like the player, its logic runs in `step()` once per fixed physics step.
  */
@@ -17,6 +18,9 @@ export class Walker extends Phaser.Physics.Arcade.Sprite {
   private dir: -1 | 1 = -1;
   private stunMs = 0;
   private dead = false;
+  private hp: number = ENEMY.WALKER_HP;
+  /** The last sword swing that hit this enemy (one hit per swing). */
+  private lastSwing = -1;
 
   constructor(
     scene: Phaser.Scene,
@@ -58,14 +62,52 @@ export class Walker extends Phaser.Physics.Arcade.Sprite {
     this.setFlipX(this.dir < 0); // art faces right
   }
 
-  /** Pushed away after touching the player (CB-3); walks away afterwards. */
-  knockback(fromX: number): void {
+  /**
+   * Hit by sword swing `swing` coming from `fromX`. Returns "hit", "defeated",
+   * or null if this swing already hit (or the enemy is already defeated).
+   */
+  swordHit(swing: number, damage: number, fromX: number): "hit" | "defeated" | null {
+    if (this.dead || swing === this.lastSwing) return null;
+    this.lastSwing = swing;
+    this.hp -= damage;
+    if (this.hp <= 0) {
+      this.defeat();
+      return "defeated";
+    }
+    this.knockback(fromX, SWORD.ENEMY_KNOCKBACK_VX);
+    this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+    this.scene.time.delayedCall(ENEMY.HIT_FLASH_MS, () => {
+      if (!this.active) return;
+      this.clearTint();
+      this.setTintMode(Phaser.TintModes.MULTIPLY);
+    });
+    return "hit";
+  }
+
+  /** Pushed away after touching the player or a sword hit (CB-3). */
+  knockback(fromX: number, speed: number = ENEMY.KNOCKBACK_VX): void {
     if (this.dead) return;
     const away = this.x < fromX ? -1 : 1;
     this.dir = away;
-    this.body.setVelocityX(away * ENEMY.KNOCKBACK_VX);
+    this.body.setVelocityX(away * speed);
     this.stunMs = ENEMY.KNOCKBACK_MS;
     this.setFlipX(away < 0);
+  }
+
+  /** Defeated by the sword: flash, pop up and fade out. */
+  private defeat(): void {
+    this.dead = true;
+    this.body.setVelocity(0, 0);
+    this.body.enable = false;
+    this.anims.stop();
+    this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+    this.scene.tweens.add({
+      targets: this,
+      y: this.y - 6,
+      alpha: 0,
+      duration: ENEMY.SQUASHED_MS,
+      onComplete: () => this.destroy(),
+    });
   }
 
   /** Squashed by the player landing on it. */

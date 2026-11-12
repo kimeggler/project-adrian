@@ -256,7 +256,9 @@ export const TOUCH = {
 export const GAMEPAD = {
   /** Standard gamepad mapping button indices. */
   JUMP: 0, // A / Cross
-  BACK: 1, // B / Circle
+  /** B / Circle: attack during play (PL-9), back in menus. */
+  ATTACK: 1,
+  BACK: 1,
   START: 9,
   DPAD_UP: 12,
   DPAD_DOWN: 13,
@@ -298,6 +300,29 @@ export const ENEMY = {
   CHECKPOINT_CLEARANCE: 3,
   /** Walk animation speed (frames per second). */
   WALK_FPS: 4,
+  /** Sword hits a walker takes (a stomp always defeats it). */
+  WALKER_HP: 2,
+  /** White flash when hit (ms). */
+  HIT_FLASH_MS: 80,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Sword (PL-9, CB-2) — Phase 8
+// ---------------------------------------------------------------------------
+
+export const SWORD = {
+  DAMAGE: 1,
+  /** Hitbox in front of the player's body (px). */
+  RANGE: 14,
+  HEIGHT: 10,
+  /** Hitbox top, measured down from the top of the player's body (px). */
+  OFFSET_Y: 2,
+  /** How long the hitbox is active per swing (ms, ≈ 7 frames). */
+  ACTIVE_MS: 120,
+  /** Time from one swing to the next (ms). */
+  COOLDOWN_MS: 350,
+  /** Enemy knockback from a sword hit (px/s). */
+  ENEMY_KNOCKBACK_VX: 110,
 } as const;
 
 export const SPIKES = {

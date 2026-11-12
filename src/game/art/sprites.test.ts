@@ -11,6 +11,8 @@ import {
   ICON_LEFT,
   ICON_PAUSE,
   ICON_RIGHT,
+  ICON_SWORD,
+  SLASH,
   KNIGHT_FRAMES,
   KNIGHT_SIZE,
   PALETTE,
@@ -32,6 +34,8 @@ const sprites: Record<string, { sprite: Sprite; w: number; h: number }> = {
   iconRight: { sprite: ICON_RIGHT, w: 8, h: 8 },
   iconJump: { sprite: ICON_JUMP, w: 8, h: 8 },
   iconPause: { sprite: ICON_PAUSE, w: 8, h: 8 },
+  iconSword: { sprite: ICON_SWORD, w: 8, h: 8 },
+  slash: { sprite: SLASH, w: 16, h: 9 },
 };
 for (const [anim, frames] of Object.entries(KNIGHT_FRAMES)) {
   frames.forEach((sprite, i) => {

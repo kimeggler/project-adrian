@@ -13,8 +13,10 @@ import {
   ICON_LEFT,
   ICON_PAUSE,
   ICON_RIGHT,
+  ICON_SWORD,
   KNIGHT_FRAMES,
   KNIGHT_SIZE,
+  SLASH,
   SLIME_FRAMES,
   SPIKES,
   type Sprite,
@@ -43,6 +45,8 @@ export const TextureKey = {
   BTN_RIGHT: "btn-right",
   BTN_JUMP: "btn-jump",
   BTN_PAUSE: "btn-pause",
+  BTN_ATTACK: "btn-attack",
+  SLASH: "slash",
 } as const;
 
 export const AnimKey = {
@@ -51,6 +55,7 @@ export const AnimKey = {
   KNIGHT_JUMP: "knight-jump",
   KNIGHT_FALL: "knight-fall",
   KNIGHT_HURT: "knight-hurt",
+  KNIGHT_ATTACK: "knight-attack",
   COIN_SPIN: "coin-spin",
   SLIME_WALK: "slime-walk",
 } as const;
@@ -75,6 +80,7 @@ export function createTextures(scene: Phaser.Scene): void {
     [TextureKey.HEART_FULL, HEART_FULL],
     [TextureKey.HEART_EMPTY, HEART_EMPTY],
     [TextureKey.DUST, DUST],
+    [TextureKey.SLASH, SLASH],
   ] as const) {
     createImage(scene, key, sprite);
   }
@@ -86,6 +92,7 @@ export function createTextures(scene: Phaser.Scene): void {
   createButton(scene, TextureKey.BTN_RIGHT, ICON_RIGHT, TOUCH.BUTTON_SIZE);
   createButton(scene, TextureKey.BTN_JUMP, ICON_JUMP, TOUCH.BUTTON_SIZE);
   createButton(scene, TextureKey.BTN_PAUSE, ICON_PAUSE, TOUCH.PAUSE_SIZE);
+  createButton(scene, TextureKey.BTN_ATTACK, ICON_SWORD, TOUCH.BUTTON_SIZE);
   createAnimations(scene);
 }
 
@@ -161,6 +168,7 @@ function createAnimations(scene: Phaser.Scene): void {
   scene.anims.create({ key: AnimKey.KNIGHT_JUMP, frames: range(k.jump.length) });
   scene.anims.create({ key: AnimKey.KNIGHT_FALL, frames: range(k.fall.length) });
   scene.anims.create({ key: AnimKey.KNIGHT_HURT, frames: range(k.hurt.length) });
+  scene.anims.create({ key: AnimKey.KNIGHT_ATTACK, frames: range(k.attack.length) });
   scene.anims.create({
     key: AnimKey.SLIME_WALK,
     frames: SLIME_FRAMES.walk.map((_, i) => ({ key: TextureKey.SLIME, frame: i })),

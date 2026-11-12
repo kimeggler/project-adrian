@@ -1,9 +1,10 @@
 import * as Phaser from "phaser";
-import { ENEMY, HEALTH, JUICE, PHYSICS, PLAYER } from "../config";
+import { ENEMY, HEALTH, JUICE, PHYSICS, PLAYER, SWORD } from "../config";
+import { swordHitbox, type Rect } from "../systems/Combat";
 import { AnimKey, TextureKey } from "../textures";
 import type { PlayerInput } from "../systems/Input";
 
-export type PlayerState = "idle" | "run" | "jump" | "fall" | "hurt";
+export type PlayerState = "idle" | "run" | "jump" | "fall" | "hurt" | "attack";
 
 /** Events the player emits so the scene can add dust, shake and sound. */
 export const PlayerEvent = {
@@ -13,6 +14,8 @@ export const PlayerEvent = {
   /** Started braking to turn around. Payload: new direction (-1 / 1). */
   TURN: "turn",
   HURT: "hurt",
+  /** A sword swing started. */
+  ATTACK: "attack",
 } as const;
 
 /** Snapshot for the F1 debug overlay. */
@@ -32,6 +35,7 @@ const STATE_ANIMS: Record<PlayerState, string> = {
   jump: AnimKey.KNIGHT_JUMP,
   fall: AnimKey.KNIGHT_FALL,
   hurt: AnimKey.KNIGHT_HURT,
+  attack: AnimKey.KNIGHT_ATTACK,
 };
 
 /** Move `value` toward `target` by at most `maxDelta`. */
@@ -71,6 +75,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private squashTween?: Phaser.Tweens.Tween;
   /** The visible knight (animations, flip, squash, flash, blink). */
   readonly view: Phaser.GameObjects.Sprite;
+  /** Sword swoosh, shown where the sword hitbox is while it's active. */
+  private readonly slash: Phaser.GameObjects.Image;
+  private facing: 1 | -1 = 1;
+  /** Sword hitbox active while > 0 (ms). */
+  private attackMs = 0;
+  /** Time until the next swing is allowed (ms). */
+  private attackCooldownMs = 0;
+  /** Increases with every swing, so each swing hits an enemy only once. */
+  private swingId = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -95,16 +108,37 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // Drawn above enemies and pickups.
     this.view = scene.add.sprite(x, y, TextureKey.PLAYER, 0).setOrigin(0.5, 1).setDepth(10);
     this.view.play(STATE_ANIMS.idle);
+    this.slash = scene.add.image(x, y, TextureKey.SLASH).setOrigin(0, 0).setDepth(11).setVisible(false);
     // POST_UPDATE runs after Arcade has moved the body for this frame.
     scene.events.on(Phaser.Scenes.Events.POST_UPDATE, this.syncView, this);
     this.once(Phaser.GameObjects.Events.DESTROY, () => {
       scene.events.off(Phaser.Scenes.Events.POST_UPDATE, this.syncView, this);
       this.view.destroy();
+      this.slash.destroy();
     });
   }
 
   private syncView(): void {
     this.view.setPosition(this.x, this.y);
+    const box = this.swordBox;
+    this.slash.setVisible(box !== null);
+    if (box) {
+      // Center the 9 px tall swoosh on the hitbox; flip it when facing left.
+      this.slash
+        .setFlipX(this.facing < 0)
+        .setPosition(box.x + (this.facing > 0 ? 0 : box.width - this.slash.width), box.y + (box.height - this.slash.height) / 2)
+        .setAlpha(Math.min(1, this.attackMs / (SWORD.ACTIVE_MS / 2)));
+    }
+  }
+
+  /** The active sword hitbox, or null between swings (CB-2). */
+  get swordBox(): Rect | null {
+    return this.attackMs > 0 ? swordHitbox(this.body, this.facing) : null;
+  }
+
+  /** Identifies the current swing (see `swordBox`). */
+  get swing(): number {
+    return this.swingId;
   }
 
   get playerState(): PlayerState {
@@ -145,15 +179,26 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     this.invincibleMs = Math.max(0, this.invincibleMs - dtMs);
+    this.attackMs = Math.max(0, this.attackMs - dtMs);
+    this.attackCooldownMs = Math.max(0, this.attackCooldownMs - dtMs);
     this.updateBlink();
 
     if (this.stunMs > 0) {
       // Knocked back: no control, but keep falling and drop any jump input.
       this.stunMs = Math.max(0, this.stunMs - dtMs);
       this.controls.consumeJumpPress();
+      this.controls.consumeAttackPress();
       this.bufferMs = 0;
       this.endStep(grounded);
       return;
+    }
+
+    // --- Sword (PL-9, CB-2) --------------------------------------------------
+    if (this.controls.consumeAttackPress() && this.attackCooldownMs <= 0) {
+      this.attackMs = SWORD.ACTIVE_MS;
+      this.attackCooldownMs = SWORD.COOLDOWN_MS;
+      this.swingId++;
+      this.emit(PlayerEvent.ATTACK);
     }
 
     if (this.controls.consumeJumpPress()) {
@@ -201,7 +246,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    if (dir !== 0) this.view.setFlipX(dir < 0);
+    // Don't turn around in the middle of a swing.
+    if (dir !== 0 && this.attackMs <= 0) this.facing = dir;
+    this.view.setFlipX(this.facing < 0);
     this.endStep(grounded);
   }
 
@@ -230,6 +277,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.stunMs = HEALTH.HURT_STUN_MS;
     this.invincibleMs = HEALTH.INVINCIBLE_MS;
     this.jumpCuttable = false;
+    this.attackMs = 0;
     this.flash();
     this.updateState(false);
     this.emit(PlayerEvent.HURT);
@@ -251,6 +299,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.lastVy = 0;
     this.turning = false;
     this.controls.consumeJumpPress();
+    this.controls.consumeAttackPress();
+    this.attackMs = 0;
+    this.attackCooldownMs = 0;
     this.squashTween?.stop();
     this.view.setScale(1);
     this.syncView();
@@ -281,6 +332,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const vy = this.body.velocity.y;
     if (this.stunMs > 0) {
       next = "hurt";
+    } else if (this.attackMs > 0) {
+      next = "attack";
     } else if (!grounded) {
       next = vy < 0 ? "jump" : "fall";
     } else if (Math.abs(this.body.velocity.x) > PLAYER.IDLE_THRESHOLD) {

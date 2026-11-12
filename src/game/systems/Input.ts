@@ -3,11 +3,12 @@ import { GAMEPAD } from "../config";
 
 const KeyCodes = Phaser.Input.Keyboard.KeyCodes;
 
-/** Default key bindings (PL-2). */
+/** Default key bindings (PL-2, PL-9). */
 export const KEY_BINDINGS = {
   left: [KeyCodes.LEFT, KeyCodes.A],
   right: [KeyCodes.RIGHT, KeyCodes.D],
   jump: [KeyCodes.SPACE, KeyCodes.W, KeyCodes.UP],
+  attack: [KeyCodes.J, KeyCodes.X],
 } as const;
 
 /** Registry key of the shared VirtualPad. */
@@ -22,6 +23,18 @@ export class VirtualPad {
   right = false;
   private jumpDown = false;
   private jumpLatched = false;
+  private attackLatched = false;
+
+  /** Sword button tapped (PL-9). */
+  pressAttack(): void {
+    this.attackLatched = true;
+  }
+
+  consumeAttackPress(): boolean {
+    const pressed = this.attackLatched;
+    this.attackLatched = false;
+    return pressed;
+  }
 
   get jumpHeld(): boolean {
     return this.jumpDown;
@@ -39,7 +52,7 @@ export class VirtualPad {
   }
 
   reset(): void {
-    this.left = this.right = this.jumpDown = this.jumpLatched = false;
+    this.left = this.right = this.jumpDown = this.jumpLatched = this.attackLatched = false;
   }
 }
 
@@ -54,7 +67,7 @@ export function getVirtualPad(scene: Phaser.Scene): VirtualPad {
 
 /**
  * Collects player intent from keyboard, touch buttons and gamepad (PL-8:
- * D-pad or left stick to move, A to jump).
+ * D-pad or left stick to move, A to jump; PL-9: B to attack).
  *
  * Held state is read live. A jump *press* is latched until the physics step
  * consumes it, so a press between two fixed steps is never lost.
@@ -66,6 +79,7 @@ export class PlayerInput {
   private readonly virtual: VirtualPad;
   private readonly gamepads: Phaser.Input.Gamepad.GamepadPlugin | null;
   private jumpLatched = false;
+  private attackLatched = false;
 
   constructor(scene: Phaser.Scene) {
     const kb = scene.input.keyboard;
@@ -83,6 +97,11 @@ export class PlayerInput {
         this.jumpLatched = true;
       });
     }
+    for (const key of add(KEY_BINDINGS.attack)) {
+      key.on(Phaser.Input.Keyboard.Events.DOWN, () => {
+        this.attackLatched = true;
+      });
+    }
 
     this.virtual = getVirtualPad(scene);
     this.virtual.reset();
@@ -92,6 +111,7 @@ export class PlayerInput {
       Phaser.Input.Gamepad.Events.BUTTON_DOWN,
       (_pad: Phaser.Input.Gamepad.Gamepad, button: Phaser.Input.Gamepad.Button) => {
         if (button.index === GAMEPAD.JUMP) this.jumpLatched = true;
+        if (button.index === GAMEPAD.ATTACK) this.attackLatched = true;
       },
     );
   }
@@ -122,6 +142,14 @@ export class PlayerInput {
     const virtual = this.virtual.consumeJumpPress();
     const pressed = this.jumpLatched || virtual;
     this.jumpLatched = false;
+    return pressed;
+  }
+
+  /** Returns true once per attack press (from any device). */
+  consumeAttackPress(): boolean {
+    const virtual = this.virtual.consumeAttackPress();
+    const pressed = this.attackLatched || virtual;
+    this.attackLatched = false;
     return pressed;
   }
 

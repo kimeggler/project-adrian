@@ -12,6 +12,8 @@ export const SfxKey = {
   LEVEL_COMPLETE: "levelComplete",
   MENU_SELECT: "menuSelect",
   STOMP: "stomp",
+  SWORD_SWING: "swordSwing",
+  ENEMY_HIT: "enemyHit",
 } as const;
 
 export type SfxKeyValue = (typeof SfxKey)[keyof typeof SfxKey];

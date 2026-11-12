@@ -65,6 +65,14 @@ const BODY = [
   "....ObBBBBBO....",
 ];
 
+/** Sword arm stretched forward; the blade itself is the SLASH sprite. */
+const BODY_ATTACK = [
+  "....ObBBBBBO....",
+  "...ObbBBBBBBFFOh",
+  "....OLLLYLLO....",
+  "....ObBBBBBO....",
+];
+
 const LEGS = {
   idle: [".....OBO.OBO....", ".....OKO.OKO....", ".....OKKOOKKO..."],
   strideA: [".....OBO..OBO...", "....OKO....OKO..", "...OKKO....OKKO."],
@@ -83,10 +91,11 @@ interface KnightPose {
   lean?: number;
   /** Replace the eye pixel (e.g. "W" for a wide, surprised eye). */
   eye?: string;
+  body?: readonly string[];
 }
 
-function knight({ plume, legs, bob = 0, lean = 0, eye = "O" }: KnightPose): Sprite {
-  let upper = [...plume, ...HELMET, ...BODY];
+function knight({ plume, legs, bob = 0, lean = 0, eye = "O", body = BODY }: KnightPose): Sprite {
+  let upper = [...plume, ...HELMET, ...body];
   const eyeRow = upper[EYE.row];
   upper[EYE.row] = eyeRow.slice(0, EYE.col) + eye + eyeRow.slice(EYE.col + 1);
   if (lean > 0) upper = upper.map((r) => r.slice(lean) + ".".repeat(lean));
@@ -112,7 +121,24 @@ export const KNIGHT_FRAMES = {
   jump: [knight({ plume: PLUME.sway, legs: LEGS.tuck })],
   fall: [knight({ plume: PLUME.up, legs: LEGS.dangle })],
   hurt: [knight({ plume: PLUME.up, legs: LEGS.idle, lean: 1, eye: "W" })],
+  attack: [knight({ plume: PLUME.sway, legs: LEGS.strideA, body: BODY_ATTACK })],
 } as const;
+
+/**
+ * Sword slash in front of the knight (16×9, facing right): the blade plus a
+ * swoosh arc. Drawn where the sword hitbox is (see SWORD in config.ts).
+ */
+export const SLASH: Sprite = [
+  "......WWWW......",
+  "..........WW....",
+  "............W...",
+  ".............W..",
+  "HHHHHHHHHHHHhWh.",
+  "OOOOOOOOOOOOOW..",
+  "............W...",
+  "..........WW....",
+  "......WWWW......",
+];
 
 export const KNIGHT_SIZE = 16;
 
@@ -218,6 +244,16 @@ export const ICON_JUMP: Sprite = [
   "..WWWW..",
   "..WWWW..",
   "........",
+];
+export const ICON_SWORD: Sprite = [
+  "......WW",
+  ".....WWW",
+  "....WWW.",
+  "...WWW..",
+  "W.WWW...",
+  ".WWW....",
+  ".WW.....",
+  "W..W....",
 ];
 export const ICON_PAUSE: Sprite = [
   "........",

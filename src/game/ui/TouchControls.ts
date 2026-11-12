@@ -11,8 +11,8 @@ export function isTouchDevice(scene: Phaser.Scene): boolean {
 }
 
 /**
- * On-screen buttons for touch devices (PL-7): ◀ ▶ bottom left, jump bottom
- * right, pause top right (GP-5). Shown automatically on touch devices, and on
+ * On-screen buttons for touch devices (PL-7): ◀ ▶ bottom left, sword and
+ * jump bottom right (PL-9), pause top right (GP-5). Shown automatically on touch devices, and on
  * other devices after the first touch (e.g. laptops with touch screens).
  */
 export class TouchControls {
@@ -31,6 +31,9 @@ export class TouchControls {
     this.holdButton(TextureKey.BTN_LEFT, M, y, (down) => (pad.left = down));
     this.holdButton(TextureKey.BTN_RIGHT, M + S + G, y, (down) => (pad.right = down));
     this.holdButton(TextureKey.BTN_JUMP, GAME_WIDTH - M - S, y, (down) => pad.setJump(down));
+    this.holdButton(TextureKey.BTN_ATTACK, GAME_WIDTH - M - S * 2 - G, y, (down) => {
+      if (down) pad.pressAttack();
+    });
 
     const pause = this.addButton(TextureKey.BTN_PAUSE, GAME_WIDTH - 2 - P, 1);
     pause.on(Phaser.Input.Events.POINTER_DOWN, () => onPause());
