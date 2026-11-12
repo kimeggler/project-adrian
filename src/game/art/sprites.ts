@@ -30,13 +30,16 @@ export const PALETTE: Readonly<Record<string, string>> = {
   d: "#663931", // dirt shade
   e: "#d9a066", // dirt pebble
   R: "#ac3232", // red
+  V: "#76428a", // slime
+  v: "#45283c", // slime shade
+  M: "#d77bba", // slime highlight
 };
 
 // ---------------------------------------------------------------------------
 // Knight (16×16 frames, facing right)
 // ---------------------------------------------------------------------------
 
-const PLUME = {
+const PLUME: Readonly<Record<"rest" | "sway" | "up", readonly string[]>> = {
   rest: ["....PPp.........", "...PPPPp........"],
   sway: ["...PPp..........", "..PPPPp........."],
   up: [".....PPp........", "...PPPPp........"],
@@ -62,6 +65,14 @@ const BODY = [
   "....ObBBBBBO....",
 ];
 
+/** Sword arm stretched forward; the blade itself is the SLASH sprite. */
+const BODY_ATTACK = [
+  "....ObBBBBBO....",
+  "...ObbBBBBBBFFOh",
+  "....OLLLYLLO....",
+  "....ObBBBBBO....",
+];
+
 const LEGS = {
   idle: [".....OBO.OBO....", ".....OKO.OKO....", ".....OKKOOKKO..."],
   strideA: [".....OBO..OBO...", "....OKO....OKO..", "...OKKO....OKKO."],
@@ -72,7 +83,7 @@ const LEGS = {
 } as const;
 
 interface KnightPose {
-  plume: readonly string[];
+  plume: keyof typeof PLUME;
   legs: readonly string[];
   /** Move the upper body up by this many pixels (running bounce). */
   bob?: number;
@@ -80,10 +91,25 @@ interface KnightPose {
   lean?: number;
   /** Replace the eye pixel (e.g. "W" for a wide, surprised eye). */
   eye?: string;
+  body?: readonly string[];
 }
 
-function knight({ plume, legs, bob = 0, lean = 0, eye = "O" }: KnightPose): Sprite {
-  let upper = [...plume, ...HELMET, ...BODY];
+/**
+ * What makes a hero look different (CB-9): its own head and plume rows (same
+ * sizes as the knight's, eye at the same spot) and a color swap for the rest.
+ */
+export interface HeroLook {
+  head: readonly string[];
+  plume: Readonly<Record<keyof typeof PLUME, readonly string[]>>;
+  /** Palette character → replacement, applied to body and legs. */
+  recolor?: Readonly<Record<string, string>>;
+}
+
+const recolorRows = (rows: readonly string[], map: Readonly<Record<string, string>> = {}) =>
+  rows.map((row) => [...row].map((c) => map[c] ?? c).join(""));
+
+function hero(look: HeroLook, { plume, legs, bob = 0, lean = 0, eye = "O", body = BODY }: KnightPose): Sprite {
+  let upper = [...look.plume[plume], ...look.head, ...recolorRows(body, look.recolor)];
   const eyeRow = upper[EYE.row];
   upper[EYE.row] = eyeRow.slice(0, EYE.col) + eye + eyeRow.slice(EYE.col + 1);
   if (lean > 0) upper = upper.map((r) => r.slice(lean) + ".".repeat(lean));
@@ -91,25 +117,80 @@ function knight({ plume, legs, bob = 0, lean = 0, eye = "O" }: KnightPose): Spri
     // Shift up and repeat the last body row so there is no gap above the legs.
     upper = [...upper.slice(bob), ...Array(bob).fill(upper[upper.length - 1])];
   }
-  return [...upper, ...legs];
+  return [...upper, ...recolorRows(legs, look.recolor)];
 }
 
+/** Animation frames of one hero, in spritesheet order. */
+export function heroFrames(look: HeroLook) {
+  const f = (pose: KnightPose) => hero(look, pose);
+  return {
+    idle: [f({ plume: "rest", legs: LEGS.idle }), f({ plume: "sway", legs: LEGS.idle })],
+    run: [
+      f({ plume: "sway", legs: LEGS.strideA }),
+      f({ plume: "sway", legs: LEGS.pass, bob: 1 }),
+      f({ plume: "sway", legs: LEGS.strideB }),
+      f({ plume: "sway", legs: LEGS.pass, bob: 1 }),
+    ],
+    jump: [f({ plume: "sway", legs: LEGS.tuck })],
+    fall: [f({ plume: "up", legs: LEGS.dangle })],
+    hurt: [f({ plume: "up", legs: LEGS.idle, lean: 1, eye: "W" })],
+    attack: [f({ plume: "sway", legs: LEGS.strideA, body: BODY_ATTACK })],
+  } as const;
+}
+
+export type HeroFrames = ReturnType<typeof heroFrames>;
+
+/** The little knight: steel helmet, red plume, blue tunic. */
+export const KNIGHT_LOOK: HeroLook = { head: HELMET, plume: PLUME };
+
+/** Ranger: green hood with a yellow feather, brown leather tunic. */
+export const RANGER_LOOK: HeroLook = {
+  head: [
+    "....OOOOOOO.....",
+    "...OlGGGGGGO....",
+    "..OlGGGGGGGGO...",
+    "..OGGGGOFFFFO...",
+    "..OgGGGOFFFFO...",
+    "..OggGGGOOOOO...",
+    "...OgggggggO....",
+  ],
+  plume: {
+    rest: ["................", "...YYy.........."],
+    sway: ["................", "..YYy..........."],
+    up: ["................", "....YYy........."],
+  },
+  recolor: { B: "L", b: "K", L: "K" },
+};
+
+/** Paladin: golden helmet with a white crest, white tunic. */
+export const PALADIN_LOOK: HeroLook = {
+  head: recolorRows(HELMET, { H: "Y", h: "W", s: "y" }),
+  plume: {
+    rest: ["....WWWh........", "...WWWWWh......."],
+    sway: ["...WWWh.........", "..WWWWWh........"],
+    up: [".....WWWh.......", "...WWWWWh......."],
+  },
+  recolor: { B: "W", b: "h" },
+};
+
 /** Knight animation frames, in spritesheet order. */
-export const KNIGHT_FRAMES = {
-  idle: [
-    knight({ plume: PLUME.rest, legs: LEGS.idle }),
-    knight({ plume: PLUME.sway, legs: LEGS.idle }),
-  ],
-  run: [
-    knight({ plume: PLUME.sway, legs: LEGS.strideA }),
-    knight({ plume: PLUME.sway, legs: LEGS.pass, bob: 1 }),
-    knight({ plume: PLUME.sway, legs: LEGS.strideB }),
-    knight({ plume: PLUME.sway, legs: LEGS.pass, bob: 1 }),
-  ],
-  jump: [knight({ plume: PLUME.sway, legs: LEGS.tuck })],
-  fall: [knight({ plume: PLUME.up, legs: LEGS.dangle })],
-  hurt: [knight({ plume: PLUME.up, legs: LEGS.idle, lean: 1, eye: "W" })],
-} as const;
+export const KNIGHT_FRAMES = heroFrames(KNIGHT_LOOK);
+
+/**
+ * Sword slash in front of the knight (16×9, facing right): the blade plus a
+ * swoosh arc. Drawn where the sword hitbox is (see SWORD in config.ts).
+ */
+export const SLASH: Sprite = [
+  "......WWWW......",
+  "..........WW....",
+  "............W...",
+  ".............W..",
+  "HHHHHHHHHHHHhWh.",
+  "OOOOOOOOOOOOOW..",
+  "............W...",
+  "..........WW....",
+  "......WWWW......",
+];
 
 export const KNIGHT_SIZE = 16;
 
@@ -216,6 +297,16 @@ export const ICON_JUMP: Sprite = [
   "..WWWW..",
   "........",
 ];
+export const ICON_SWORD: Sprite = [
+  "......WW",
+  ".....WWW",
+  "....WWW.",
+  "...WWW..",
+  "W.WWW...",
+  ".WWW....",
+  ".WW.....",
+  "W..W....",
+];
 export const ICON_PAUSE: Sprite = [
   "........",
   ".WW..WW.",
@@ -225,4 +316,309 @@ export const ICON_PAUSE: Sprite = [
   ".WW..WW.",
   ".WW..WW.",
   "........",
+];
+
+// ---------------------------------------------------------------------------
+// Walker enemy: a purple slime (16×16 frames, facing right)
+// ---------------------------------------------------------------------------
+
+const EMPTY_ROW = "................";
+
+export const SLIME_FRAMES = {
+  walk: [
+    [
+      ...Array<string>(5).fill(EMPTY_ROW),
+      "......OOOO......",
+      "....OOVVVVOO....",
+      "...OVVMMVVVVO...",
+      "..OVVMVVVVVVVO..",
+      "..OVVVVWOVWOVO..",
+      ".OVVVVVWOVWOVVO.",
+      ".OVVVVVVVVVVVVO.",
+      ".OVVVVVVVVVVVVO.",
+      ".OvVVVVVVVVVVvO.",
+      "..OvvvvvvvvvvO..",
+      "...OOOOOOOOOO...",
+    ],
+    [
+      ...Array<string>(6).fill(EMPTY_ROW),
+      "......OOOO......",
+      "...OOOVVVVOOO...",
+      "..OVVMMVVVVVVO..",
+      ".OVVMVVVVVVVVVO.",
+      ".OVVVVVWOVWOVVO.",
+      "OVVVVVVWOVWOVVVO",
+      "OVVVVVVVVVVVVVVO",
+      "OvVVVVVVVVVVVVvO",
+      ".OvvvvvvvvvvvvO.",
+      "..OOOOOOOOOOOO..",
+    ],
+  ],
+  squashed: [
+    [
+      ...Array<string>(12).fill(EMPTY_ROW),
+      "....OOOOOOOO....",
+      "..OOVVWVVWVVOO..",
+      ".OVVVVVVVVVVVVO.",
+      "OOOOOOOOOOOOOOOO",
+    ],
+  ],
+} as const;
+
+// ---------------------------------------------------------------------------
+// Jumper enemy: a blue hopper (16×16 frames, facing right)
+// ---------------------------------------------------------------------------
+
+const HOPPER_CROUCH: Sprite = [
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  "................",
+  ".....OO..OO.....",
+  "....OWOOOOWO....",
+  "...OBBBBBBBBO...",
+  "..OBBhBBBBBBBO..",
+  "..OBBBBBBBBBBO..",
+  ".OBBBBBBBBBBBBO.",
+  ".ObBBBBBBBBBBbO.",
+  "OObbbbbbbbbbbbOO",
+  "OYYO........OYYO",
+];
+
+const HOPPER_AIR: Sprite = [
+  "................",
+  "................",
+  "................",
+  "................",
+  ".....OO..OO.....",
+  "....OWOOOOWO....",
+  "...OBBBBBBBBO...",
+  "...OBhBBBBBBO...",
+  "...OBBBBBBBBO...",
+  "...OBBBBBBBBO...",
+  "...ObBBBBBBbO...",
+  "....ObbbbbbO....",
+  "....OYO..OYO....",
+  "....OYO..OYO....",
+  "...OYYO..OYYO...",
+  "................",
+];
+
+export const HOPPER_FRAMES = { crouch: [HOPPER_CROUCH], air: [HOPPER_AIR] } as const;
+
+// ---------------------------------------------------------------------------
+// Shooter enemy: a stone totem that spits rocks (16×16 frames, facing right)
+// ---------------------------------------------------------------------------
+
+const TOTEM_TOP = [
+  "................",
+  "................",
+  "................",
+  "................",
+  "...OOOOOOOOOO...",
+  "..OhhHHHHHHHsO..",
+  "..OhHHHHHHHHsO..",
+];
+const TOTEM_BOTTOM = [
+  "..OHHHHHHHOOOO..",
+  "..OHHHHHHHHHsO..",
+  "..OsHHHHHHHHsO..",
+  ".OssssssssssssO.",
+  ".OOOOOOOOOOOOOO.",
+];
+
+export const TOTEM_FRAMES = {
+  idle: [
+    [
+      ...TOTEM_TOP,
+      "..OHHHORHHORsO..",
+      "..OHHHHHHHHHsO..",
+      "..OHHHHHHOOOOO..",
+      "..OHHHHHHOvvvO..",
+      ...TOTEM_BOTTOM,
+    ],
+  ],
+  /** Eyes and mouth glow just before it shoots (a warning for the player). */
+  charge: [
+    [
+      ...TOTEM_TOP,
+      "..OHHHOWHHOWsO..",
+      "..OHHHHHHHHHsO..",
+      "..OHHHHHHOOOOO..",
+      "..OHHHHHHOYYYO..",
+      ...TOTEM_BOTTOM,
+    ],
+  ],
+} as const;
+
+/** The totem's rock, 6×6. */
+export const ROCK: Sprite = [".OOOO.", "OhHHsO", "OHhHsO", "OHHssO", "OsssvO", ".OOOO."];
+
+// ---------------------------------------------------------------------------
+// Power-up items, 8×8 (CB-6)
+// ---------------------------------------------------------------------------
+
+export const ITEM_BOOTS: Sprite = [
+  "..OOOO..",
+  "..OYYO..",
+  "WWOKKO..",
+  ".WOKKO..",
+  "..OKKOO.",
+  ".OKKKKKO",
+  ".OKKKKKO",
+  ".OOOOOOO",
+];
+
+export const ITEM_SHIELD: Sprite = [
+  ".OOOOOO.",
+  "OBBYYBBO",
+  "OBBYYBBO",
+  "OYYYYYYO",
+  "OBBYYBBO",
+  ".OBYYBO.",
+  "..OBBO..",
+  "...OO...",
+];
+
+export const ITEM_AXE: Sprite = [
+  "...OOOO.",
+  "..OLOhHO",
+  "..OLOHHO",
+  "..OLOOO.",
+  "..OLO...",
+  "..OLO...",
+  "..OLO...",
+  "...O....",
+];
+
+/** Rotate a square sprite 90° clockwise. */
+function rotate(sprite: Sprite): Sprite {
+  const n = sprite.length;
+  return sprite.map((_, r) => Array.from({ length: n }, (_, c) => sprite[n - 1 - c][r]).join(""));
+}
+
+/** Thrown axe: four quarter turns (rotating whole pixels keeps it crisp). */
+export const AXE_SPIN_FRAMES: readonly Sprite[] = [
+  ITEM_AXE,
+  rotate(ITEM_AXE),
+  rotate(rotate(ITEM_AXE)),
+  rotate(rotate(rotate(ITEM_AXE))),
+];
+
+// ---------------------------------------------------------------------------
+// Boss (CB-8): the Slime King, 32×24, facing right
+// ---------------------------------------------------------------------------
+
+const SLIME_KING_A: Sprite = [
+  "................................",
+  "................................",
+  "................................",
+  "...........Y..Y..Y..Y...........",
+  "...........YY.YY.YY.Y...........",
+  "...........YYYYYYYYYY...........",
+  "...........yYRYyYRYyY...........",
+  "...........yyyyyyyyyy...........",
+  "..........OOOOOOOOOOOO..........",
+  "........OOVVVVVVVVVVVvOO........",
+  ".......OVMMVVVVVVVVVVVvvO.......",
+  ".....OOVMMVVVVVVVVVVVVvvvOO.....",
+  "....OVVVMVVVVVVVVVVVVVVvvvvO....",
+  "....OVVVVVVVOOVVVVVVOOVvvvvO....",
+  "...OVVVVVVVVWWWVVVVWWWVVvvvvO...",
+  "..OVVVVVVVVVWWOVVVVWWOVVvvvvvO..",
+  "..OVVVVVVVVVWWOVVVVWWOVVVvvvvO..",
+  ".OVVVVVVVVVVVVVVVVVVVVVVVvvvvvO.",
+  ".OVVVVVVVVVVVVOVVVVOVVVVVvvvvvO.",
+  ".OVVVVVVVVVVVVOOOOOOVVVVVvvvvvO.",
+  ".OvvvvvvvvvvvvvvvvvvvvvvvvvvvvO.",
+  ".OvvvvvvvvvvvvvvvvvvvvvvvvvvvvO.",
+  ".OvvvvvvvvvvvvvvvvvvvvvvvvvvvvO.",
+  "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+];
+
+const SLIME_KING_B: Sprite = [
+  "................................",
+  "................................",
+  "................................",
+  "................................",
+  "................................",
+  "...........Y..Y..Y..Y...........",
+  "...........YY.YY.YY.Y...........",
+  "...........YYYYYYYYYY...........",
+  "...........yYRYyYRYyY...........",
+  "...........yyyyyyyyyy...........",
+  "..........OOOOOOOOOOOO..........",
+  "........OOVVVVVVVVVVVvOO........",
+  "......OOVMMVVVVVVVVVVVvvOO......",
+  ".....OVVMMVVVVVVVVVVVVVvvvO.....",
+  "....OVVVMVVVOOVVVVVVOOVvvvvO....",
+  "...OVVVVVVVVWWWVVVVWWWVVvvvvO...",
+  "..OVVVVVVVVVWWOVVVVWWOVVvvvvvO..",
+  "..OVVVVVVVVVWWOVVVVWWOVVVvvvvO..",
+  ".OVVVVVVVVVVVVVVVVVVVVVVVvvvvvO.",
+  ".OVVVVVVVVVVVVOVVVVOVVVVVvvvvvO.",
+  ".OvvvvvvvvvvvvOOOOOOvvvvvvvvvvO.",
+  ".OvvvvvvvvvvvvvvvvvvvvvvvvvvvvO.",
+  ".OvvvvvvvvvvvvvvvvvvvvvvvvvvvvO.",
+  "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+];
+
+const SLIME_KING_AIR: Sprite = [
+  "................................",
+  "...........Y..Y..Y..Y...........",
+  "...........YY.YY.YY.Y...........",
+  "...........YYYYYYYYYY...........",
+  "...........yYRYyYRYyY...........",
+  "...........yyyyyyyyyy...........",
+  "...........OOOOOOOOOO...........",
+  "..........OVVVVVVVVVvO..........",
+  "........OOMVVVVVVVVVVvOO........",
+  ".......OMMVVVVVVVVVVVvvvO.......",
+  "......OVMVVVVVVVVVVVVVvvvO......",
+  "......OVVVVVVVVVVVVVVVvvvO......",
+  ".....OVVVVVVOOVVVVVVOOVvvvO.....",
+  ".....OVVVVVVWWWVVVVWWWVvvvO.....",
+  "....OVVVVVVVWWOVVVVWWOVvvvvO....",
+  "....OVVVVVVVWWOVVVVWWOVvvvvO....",
+  "...OVVVVVVVVVVVVVVVVVVVVvvvvO...",
+  "...OVVVVVVVVVVOVVVVOVVVVvvvvO...",
+  "...OVVVVVVVVVVOOOOOOVVVVvvvvO...",
+  "...OVVVVVVVVVVVVVVVVVVVVvvvvO...",
+  "...OvvvvvvvvvvvvvvvvvvvvvvvvO...",
+  "...OvvvvvvvvvvvvvvvvvvvvvvvvO...",
+  "...OvvvvvvvvvvvvvvvvvvvvvvvvO...",
+  "..OOOOOOOOOOOOOOOOOOOOOOOOOOOO..",
+];
+
+/** Idle (two frames, a slow wobble) and in the air (taller and narrower). */
+export const SLIME_KING_FRAMES = {
+  idle: [SLIME_KING_A, SLIME_KING_B],
+  air: [SLIME_KING_AIR],
+} as const;
+
+// ---------------------------------------------------------------------------
+// Blocks (WO-10)
+// ---------------------------------------------------------------------------
+
+/** A hidden bonus block after it was bumped: steel with a golden gem. */
+export const BONUS_BLOCK_USED: Sprite = [
+  "OOOOOOOOOOOOOOOO",
+  "OhhhhhhhhhhhhhhO",
+  "OhHHHHHHHHHHHHsO",
+  "OhHsHHHHHHHHsHsO",
+  "OhHHHHHOOHHHHHsO",
+  "OhHHHHOYYOHHHHsO",
+  "OhHHHOYWYyOHHHsO",
+  "OhHHOYWYYyyOHHsO",
+  "OhHHOYYYYyyOHHsO",
+  "OhHHHOYYyyOHHHsO",
+  "OhHHHHOyyOHHHHsO",
+  "OhHHHHHOOHHHHHsO",
+  "OhHsHHHHHHHHsHsO",
+  "OhHHHHHHHHHHHHsO",
+  "OhsssssssssssssO",
+  "OOOOOOOOOOOOOOOO",
 ];

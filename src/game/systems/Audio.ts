@@ -11,6 +11,20 @@ export const SfxKey = {
   CHECKPOINT: "checkpoint",
   LEVEL_COMPLETE: "levelComplete",
   MENU_SELECT: "menuSelect",
+  STOMP: "stomp",
+  SWORD_SWING: "swordSwing",
+  ENEMY_HIT: "enemyHit",
+  SHOOT: "shoot",
+  SWORD_UPGRADE: "swordUpgrade",
+  POWER_UP: "powerUp",
+  POWER_DOWN: "powerDown",
+  AXE_THROW: "axeThrow",
+  BLOCK_BREAK: "blockBreak",
+  BONUS: "bonus",
+  BOSS_SLAM: "bossSlam",
+  BOSS_HIT: "bossHit",
+  BOSS_DEFEAT: "bossDefeat",
+  GATE: "gate",
 } as const;
 
 export type SfxKeyValue = (typeof SfxKey)[keyof typeof SfxKey];

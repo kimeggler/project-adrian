@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  BLOCKS,
+  BOSS,
+  bossHp,
+  difficultyFor,
+  ENEMY,
   LEVELGEN,
+  POWERUP,
   maxGapTiles,
   maxStepTiles,
   TILE,
@@ -100,9 +106,11 @@ describe("level generator", () => {
       }
 
       // Gaps no wider than the limit; ground steps no higher than the limit.
-      // A floating platform tile counts as support and splits a pit in two.
+      // A floating platform tile counts as support and splits a pit in two,
+      // and so does the path of a moving platform (WO-10).
       const hasPlatform = (c: number) =>
-        lvl.data.some((row) => row[c] === TileId.BLOCK);
+        lvl.data.some((row) => row[c] === TileId.BLOCK || row[c] === TileId.BREAKABLE) ||
+        lvl.movingPlatforms.some((p) => c > p.leftLedgeCol && c < p.rightLedgeCol);
       let gap = 0;
       for (let c = 1; c < w - 1; c++) {
         if (ground[c] === 0 && hasPlatform(c)) {
@@ -123,10 +131,87 @@ describe("level generator", () => {
         expect(lvl.heightTiles - ground[c]).toBeGreaterThanOrEqual(LEVELGEN.MIN_HEADROOM);
       }
 
-      // Exactly one checkpoint, standing on ground.
-      expect(lvl.checkpoints).toHaveLength(1);
-      expect(ground[Math.floor(lvl.checkpoints[0].x / TILE)]).toBeGreaterThan(0);
+      // One checkpoint (two on boss levels: one before the arena), on ground.
+      expect(lvl.checkpoints).toHaveLength(lvl.boss ? 2 : 1);
+      for (const cp of lvl.checkpoints) expect(ground[Math.floor(cp.x / TILE)]).toBeGreaterThan(0);
     }
+  }, SLOW);
+
+  it("places enemies only on free, flat patrol areas", () => {
+    const safe = WORLD.SAFE_ZONE_TILES;
+    const perLevel: number[][] = Array.from({ length: LEVELS }, () => []);
+    for (const { seed, level } of cases.slice(0, 300)) {
+      const lvl = generateLevel(seed, level).level;
+      const ground = groundHeights(lvl);
+      const w = lvl.widthTiles;
+      const spikeCols = new Set(lvl.spikes.map((s) => Math.floor(s.x / TILE)));
+      const checkpointCol = Math.floor(lvl.checkpoints[0].x / TILE);
+      perLevel[level - 1].push(lvl.enemies.length);
+
+      for (const e of lvl.enemies) {
+        const from = e.minX / TILE;
+        const to = e.maxX / TILE - 1;
+        expect(to - from + 1).toBeGreaterThanOrEqual(ENEMY.MIN_PATROL_TILES);
+        expect(e.x).toBeGreaterThan(e.minX);
+        expect(e.x).toBeLessThan(e.maxX);
+        expect(from).toBeGreaterThan(safe);
+        expect(to).toBeLessThan(w - 1 - safe);
+        const row = e.y / TILE; // surface row the walker stands on
+        for (let c = from; c <= to; c++) {
+          expect(lvl.heightTiles - ground[c], `ground at ${c}`).toBe(row);
+          expect(spikeCols.has(c)).toBe(false);
+          expect(Math.abs(c - checkpointCol)).toBeGreaterThan(ENEMY.CHECKPOINT_CLEARANCE);
+          for (let k = 1; k <= LEVELGEN.MIN_HEADROOM; k++) {
+            expect(lvl.data[row - k][c]).toBe(TileId.EMPTY);
+          }
+        }
+      }
+    }
+    const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    // Every level type has some enemies, and harder levels have more.
+    expect(avg(perLevel[0])).toBeGreaterThan(0.5);
+    expect(avg(perLevel[LEVELS - 1])).toBeGreaterThan(avg(perLevel[0]));
+  }, SLOW);
+
+  it("mixes enemy kinds and scales their strength by level (CB-4, CB-7)", () => {
+    const kinds = (level: number) => {
+      const counts = { walker: 0, jumper: 0, shooter: 0 };
+      for (let seed = 1; seed <= 60; seed++) {
+        for (const e of generateLevel(seed, level).level.enemies) {
+          counts[e.kind]++;
+          const d = difficultyFor(level);
+          expect(e.damage).toBe(d.damage);
+          expect(e.speed).toBe(d.walkerSpeed);
+          expect(e.hp).toBeGreaterThanOrEqual(2 + d.hpBonus);
+        }
+      }
+      return counts;
+    };
+    const first = kinds(1);
+    expect(first.jumper + first.shooter).toBe(0); // level 1: walkers only
+    const later = kinds(8);
+    expect(later.walker).toBeGreaterThan(0);
+    expect(later.jumper).toBeGreaterThan(0);
+    expect(later.shooter).toBeGreaterThan(0);
+  }, SLOW);
+
+  it("places power-ups on free flat ground, away from enemies (CB-6)", () => {
+    const kinds = new Set<string>();
+    for (const { seed, level } of cases.slice(0, 200)) {
+      const lvl = generateLevel(seed, level).level;
+      const ground = groundHeights(lvl);
+      expect(lvl.powerUps.length).toBeLessThanOrEqual(difficultyFor(level).powerUps);
+      for (const p of lvl.powerUps) {
+        kinds.add(p.kind);
+        const c = Math.floor(p.x / TILE);
+        expect(ground[c]).toBeGreaterThan(0);
+        // Floats just above the ground, inside free space.
+        expect(p.y).toBe((lvl.heightTiles - ground[c]) * TILE - POWERUP.ITEM_HEIGHT);
+        expect(lvl.spikes.some((s) => Math.floor(s.x / TILE) === c)).toBe(false);
+        expect(lvl.enemies.some((e) => p.x > e.minX && p.x < e.maxX)).toBe(false);
+      }
+    }
+    expect(kinds).toEqual(new Set(["boots", "shield", "axe"]));
   }, SLOW);
 
   it("places coins in free space only", () => {
@@ -139,6 +224,100 @@ describe("level generator", () => {
       }
     }
   }, SLOW);
+});
+
+describe("world variety (WO-10) and boss arenas (CB-8)", () => {
+  const sample = cases.slice(0, 200).map(({ seed, level }) => ({ seed, level, lvl: generateLevel(seed, level).level }));
+
+  it("rides moving platforms between two ledges at the platform's height over an open pit", () => {
+    let count = 0;
+    for (const { lvl } of sample) {
+      for (const p of lvl.movingPlatforms) {
+        count++;
+        const row = p.y / TILE;
+        expect(Number.isInteger(row)).toBe(true);
+        // Ground tops at both ledges, level with the platform.
+        expect(lvl.data[row][p.leftLedgeCol]).toBe(TileId.GROUND_TOP);
+        expect(lvl.data[row][p.rightLedgeCol]).toBe(TileId.GROUND_TOP);
+        // The pit in between is completely open (the static platform is gone).
+        for (let c = p.leftLedgeCol + 1; c < p.rightLedgeCol; c++) {
+          for (let r = 0; r < lvl.heightTiles; r++) expect(lvl.data[r][c]).toBe(TileId.EMPTY);
+        }
+        expect(p.rightLedgeCol - p.leftLedgeCol - 1).toBeGreaterThanOrEqual(3);
+        expect(p.fromX).toBe((p.leftLedgeCol + 1) * TILE);
+        expect(p.toX).toBeGreaterThan(p.fromX);
+      }
+    }
+    expect(count).toBeGreaterThan(50);
+  });
+
+  it("makes only obstacles standing on the ground breakable", () => {
+    let count = 0;
+    for (const { lvl } of sample) {
+      for (let c = 0; c < lvl.widthTiles; c++) {
+        const rows = lvl.data.map((row) => row[c]);
+        const first = rows.indexOf(TileId.BREAKABLE);
+        if (first < 0) continue;
+        count++;
+        // A solid stack of breakable blocks, then ground right below it.
+        let r = first;
+        while (rows[r] === TileId.BREAKABLE) r++;
+        expect(rows[r]).toBe(TileId.GROUND_TOP);
+        expect(rows.slice(r).includes(TileId.BREAKABLE)).toBe(false);
+      }
+    }
+    expect(count).toBeGreaterThan(50);
+  });
+
+  it("hangs hidden blocks over open, flat ground, out of the way", () => {
+    let count = 0;
+    for (const { lvl } of sample) {
+      const heights = groundHeights(lvl);
+      const spikeCols = new Set(lvl.spikes.map((p) => Math.floor(p.x / TILE)));
+      for (const { c, r } of lvl.hiddenBlocks) {
+        count++;
+        const g = heights[c];
+        expect(r).toBe(lvl.heightTiles - g - BLOCKS.HIDDEN_ROWS_ABOVE);
+        for (let cc = c - BLOCKS.HIDDEN_CLEARANCE; cc <= c + BLOCKS.HIDDEN_CLEARANCE; cc++) {
+          expect(heights[cc]).toBe(g);
+          expect(spikeCols.has(cc)).toBe(false);
+          for (let rr = r; rr < lvl.heightTiles - g; rr++) expect(lvl.data[rr][cc]).toBe(TileId.EMPTY);
+        }
+      }
+    }
+    expect(count).toBeGreaterThan(100);
+  });
+
+  it(`ends every ${BOSS.EVERY}th level in a flat, closed-off boss arena`, () => {
+    for (const { seed, level, lvl } of sample) {
+      if (level % BOSS.EVERY !== 0) {
+        expect(lvl.boss).toBeUndefined();
+        continue;
+      }
+      const a = lvl.boss!;
+      expect(a, `seed ${seed}`).toBeDefined();
+      expect(a.hp).toBe(bossHp(level));
+      expect(a.rightGateCol - a.leftGateCol + 1).toBe(BOSS.ARENA_TILES);
+      const heights = groundHeights(lvl);
+      for (let c = a.leftGateCol; c <= a.rightGateCol; c++) {
+        expect(heights[c]).toBe(BOSS.GROUND);
+        for (let r = 0; r < a.floorRow; r++) expect(lvl.data[r][c]).toBe(TileId.EMPTY);
+      }
+      // A checkpoint just before the arena, and nothing else in or near it.
+      const lobby = lvl.checkpoints.at(-1)!;
+      expect(Math.floor(lobby.x / TILE)).toBeLessThan(a.leftGateCol);
+      expect(Math.floor(lobby.x / TILE)).toBeGreaterThanOrEqual(a.leftGateCol - BOSS.LOBBY_TILES);
+      const lobbyStart = (a.leftGateCol - BOSS.LOBBY_TILES) * TILE;
+      const inArea = (x: number) => x >= lobbyStart;
+      // Patrol areas may end right where the lobby starts.
+      expect(lvl.enemies.some((e) => e.maxX > lobbyStart)).toBe(false);
+      expect(lvl.powerUps.some((p) => inArea(p.x))).toBe(false);
+      expect(lvl.hiddenBlocks.some((b) => inArea(b.c * TILE))).toBe(false);
+      // The flag is past the right gate.
+      expect(Math.floor(lvl.flag.x / TILE)).toBeGreaterThan(a.rightGateCol);
+    }
+    expect(bossHp(10)).toBe(BOSS.BASE_HP + BOSS.HP_PER_BOSS);
+  });
 });
 
 describe("reachability check", () => {
@@ -166,6 +345,10 @@ describe("reachability check", () => {
       spikes: [],
       checkpoints: [],
       coins: [],
+      enemies: [],
+      powerUps: [],
+      movingPlatforms: [],
+      hiddenBlocks: [],
     };
   }
 
@@ -175,6 +358,19 @@ describe("reachability check", () => {
 
   it("rejects a gap that is too wide", () => {
     expect(checkReachability(levelWithGap(6)).reachable).toBe(false);
+  });
+
+  it("crosses a pit too wide to jump on a moving platform (WO-10)", () => {
+    const lvl = levelWithGap(6);
+    const y = (lvl.heightTiles - 2) * TILE;
+    lvl.movingPlatforms = [{ fromX: 20 * TILE, toX: 26 * TILE - 32, y, leftLedgeCol: 19, rightLedgeCol: 26 }];
+    expect(checkReachability(lvl).reachable).toBe(true);
+  });
+
+  it("ignores hidden blocks (not solid until revealed)", () => {
+    const lvl = levelWithGap(6);
+    lvl.hiddenBlocks = [20, 21, 22, 23, 24, 25].map((c) => ({ c, r: lvl.heightTiles - 2 }));
+    expect(checkReachability(lvl).reachable).toBe(false);
   });
 
   it("rejects a path blocked by a wall of spikes", () => {

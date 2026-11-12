@@ -14,6 +14,11 @@
  * slightly stronger knight (SIM_STRENGTHS), and only counts if both land on
  * the same surface. Ledge jumps also start with a few pixels of foothold left.
  *
+ * Moving platforms (WO-10) are not simulated: each one links the ledges on
+ * both sides of its pit, since its top is level with them and it rests at
+ * each end. Hidden blocks are ignored (not solid until revealed) and
+ * breakable blocks count as solid, so neither is ever needed to finish.
+ *
  * Pure TypeScript, no Phaser.
  */
 import { PHYSICS, PLAYER, SPIKES, TILE, WORLD } from "../config";
@@ -349,6 +354,12 @@ export function checkReachability(level: Level, withPath = false): ReachabilityR
     for (const dc of [-1, 1]) {
       const next = { c: cell.c + dc, r: cell.r };
       if (grid.standable(next.c, next.r)) visit(next, cell);
+    }
+    // Riding a moving platform from one ledge to the other.
+    for (const p of level.movingPlatforms) {
+      if (cell.r !== Math.round(p.y / TILE)) continue;
+      if (cell.c === p.leftLedgeCol) visit({ c: p.rightLedgeCol, r: cell.r }, cell);
+      else if (cell.c === p.rightLedgeCol) visit({ c: p.leftLedgeCol, r: cell.r }, cell);
     }
     // Jumps and walk-offs.
     for (const input of movesFrom(grid, cell)) {

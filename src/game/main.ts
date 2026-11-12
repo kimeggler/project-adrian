@@ -1,6 +1,6 @@
 import * as Phaser from "phaser";
 import { getAudioContext } from "@/lib/audioContext";
-import { BACKGROUND_COLOR, GAME_HEIGHT, GAME_WIDTH, PHYSICS } from "./config";
+import { GAME_HEIGHT, GAME_WIDTH, PHYSICS } from "./config";
 import { BootScene } from "./scenes/BootScene";
 import { GameOverScene } from "./scenes/GameOverScene";
 import { GameScene } from "./scenes/GameScene";
@@ -9,7 +9,9 @@ import { PauseScene } from "./scenes/PauseScene";
 import { SettingsScene } from "./scenes/SettingsScene";
 import { UIScene } from "./scenes/UIScene";
 import { START_DATA_KEY } from "./events";
+import { getSave } from "./systems/Save";
 import type { LevelStartData } from "./types";
+import { getWorld } from "./worlds";
 
 /**
  * Creates the Phaser game inside `parent`.
@@ -21,7 +23,8 @@ export function createGame(parent: HTMLElement, start: LevelStartData): Phaser.G
     parent,
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
-    backgroundColor: BACKGROUND_COLOR,
+    // Matches the selected world skin (BootScene draws its tiles and layers).
+    backgroundColor: getWorld(getSave().world).background,
     banner: false,
     // Share the app's AudioContext, unlocked by the "Start game" click (AU-2).
     audio: { context: getAudioContext() },

@@ -1,4 +1,4 @@
-import { TILE, WORLD } from "../config";
+import { PLATFORM, TILE, WORLD } from "../config";
 import { TileId, type LevelData } from "../tiles";
 import type { Level, Point } from "./level";
 
@@ -9,7 +9,9 @@ export type { Level } from "./level";
  *
  * Each section tests one thing: step-ups of 1–3 tiles, drops, gaps of 2–4
  * tiles, a low ceiling for head bumps, a floating platform and a pillar.
- * Phase 3 adds spikes and a checkpoint in the middle.
+ * Phase 3 adds spikes and a checkpoint in the middle. Phase 12 adds a moving
+ * platform over the 4-tile gap, a hidden block near the start and a
+ * breakable obstacle before the power-ups.
  */
 export function buildTestLevel(): Level {
   const H = WORLD.LEVEL_HEIGHT_TILES;
@@ -52,6 +54,9 @@ export function buildTestLevel(): Level {
   // Floating platform, 3 tiles above the floor.
   for (let x = 72; x <= 74; x++) data[4][x] = TileId.BLOCK;
 
+  // Breakable obstacle, 2 tiles high (WO-10).
+  for (let y = H - 4; y <= H - 3; y++) data[y][80] = TileId.BREAKABLE;
+
   // Solid walls at both ends (WO-1).
   for (let y = 0; y < H; y++) {
     data[y][0] = TileId.WALL;
@@ -71,8 +76,34 @@ export function buildTestLevel(): Level {
     heightTiles: H,
     spawn: { x: 3 * TILE, y: (H - ground[3]) * TILE },
     flag: onGround(flagCol),
-    spikes: [39, 40, 60, 83].map(onGround),
+    spikes: [39, 40, 60, 88].map(onGround),
     checkpoints: [onGround(49)],
     coins: [],
+    // One of each power-up on the flat stretch before the flag.
+    powerUps: [
+      { kind: "boots" as const, x: 82 * TILE + TILE / 2, y: (H - 2) * TILE - 10 },
+      { kind: "shield" as const, x: 84 * TILE + TILE / 2, y: (H - 2) * TILE - 10 },
+      { kind: "axe" as const, x: 86 * TILE + TILE / 2, y: (H - 2) * TILE - 10 },
+    ],
+    // One walker under the low ceiling: tests stomping with little headroom.
+    movingPlatforms: [
+      { fromX: 53 * TILE, toX: 57 * TILE - PLATFORM.WIDTH, y: (H - 2) * TILE, leftLedgeCol: 52, rightLedgeCol: 57 },
+    ],
+    // Four tiles above the floor near the spawn: jump into it from below.
+    hiddenBlocks: [{ c: 7, r: H - 2 - 4 }],
+    enemies: [
+      {
+        kind: "walker",
+        x: 66 * TILE + TILE / 2,
+        y: (H - 2) * TILE,
+        minX: 63 * TILE,
+        maxX: 71 * TILE,
+        speed: 28,
+        hp: 2,
+        damage: 1,
+        fireIntervalMs: 0,
+        projectileSpeed: 0,
+      },
+    ],
   };
 }

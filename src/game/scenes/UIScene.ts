@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { GAME_WIDTH } from "../config";
+import { GAME_WIDTH, UI, type PowerUpKind } from "../config";
 import { getVirtualPad } from "../systems/Input";
 import { TextureKey } from "../textures";
 import { TouchControls } from "../ui/TouchControls";
@@ -26,6 +26,12 @@ export class UIScene extends Phaser.Scene {
   private levelText!: Phaser.GameObjects.Text;
   private last?: HudState;
 
+  private powerUpIcons = new Map<PowerUpKind, Phaser.GameObjects.Image>();
+  private powerUpBars!: Phaser.GameObjects.Graphics;
+  private bossName!: Phaser.GameObjects.Text;
+  private bossBar!: Phaser.GameObjects.Graphics;
+  private toastText?: Phaser.GameObjects.Text;
+
   private debugText!: Phaser.GameObjects.Text;
   private debugVisible = false;
 
@@ -36,6 +42,15 @@ export class UIScene extends Phaser.Scene {
   create(): void {
     this.hearts = [];
     this.last = undefined;
+    this.toastText = undefined;
+    this.powerUpIcons = new Map([
+      ["boots", this.add.image(0, 0, TextureKey.ITEM_BOOTS).setOrigin(0).setVisible(false)],
+      ["shield", this.add.image(0, 0, TextureKey.ITEM_SHIELD).setOrigin(0).setVisible(false)],
+      ["axe", this.add.image(0, 0, TextureKey.ITEM_AXE).setOrigin(0).setVisible(false)],
+    ]);
+    this.powerUpBars = this.add.graphics();
+    this.bossName = this.add.text(GAME_WIDTH - 4, 20, "", hudStyle()).setOrigin(1, 0).setVisible(false);
+    this.bossBar = this.add.graphics();
 
     this.livesText = this.add.text(0, 2, "", hudStyle());
     this.add.image(76, 3, TextureKey.COIN).setOrigin(0);
@@ -44,7 +59,7 @@ export class UIScene extends Phaser.Scene {
     this.levelText = this.add.text(GAME_WIDTH - 3, 2, "", hudStyle()).setOrigin(1, 0);
 
     this.debugText = this.add
-      .text(2, 14, "", debugStyle())
+      .text(2, 30, "", debugStyle())
       .setVisible(this.debugVisible)
       .setDepth(1000);
     if (this.debugVisible) this.setPhysicsDebug(true);
@@ -65,8 +80,59 @@ export class UIScene extends Phaser.Scene {
   update(): void {
     const game = this.scene.get(SceneKey.GAME) as GameScene;
     if (!game.player) return;
+    const toast = game.consumeToast?.();
+    if (toast) this.showToast(toast);
     this.updateHud(game.hud);
+    this.updatePowerUps(game);
+    this.updateBossBar(game);
     if (this.debugVisible) this.updateDebug(game);
+  }
+
+  /**
+   * Active power-ups under the hearts: icon plus a shrinking timer bar.
+   * Both blink during the last seconds (CB-6 warning).
+   */
+  private updatePowerUps(game: GameScene): void {
+    const powerUps = game.player.powerUps;
+    const g = this.powerUpBars.clear();
+    for (const icon of this.powerUpIcons.values()) icon.setVisible(false);
+    powerUps.active().forEach((kind, i) => {
+      if (!powerUps.visible(kind)) return;
+      const x = 4 + i * 30;
+      const y = 20; // below the top row (its text boxes reach y = 18)
+      this.powerUpIcons.get(kind)?.setPosition(x, y).setVisible(true);
+      g.fillStyle(0x222034).fillRect(x + 10, y + 2, 18, 4);
+      g.fillStyle(powerUps.expiring(kind) ? 0xd95763 : 0xfbf236).fillRect(x + 11, y + 3, Math.ceil(16 * powerUps.fraction(kind)), 2);
+    });
+  }
+
+  /** Boss name and health bar in the top-right corner during the fight (CB-8). */
+  private updateBossBar(game: GameScene): void {
+    const boss = game.bossBar;
+    const g = this.bossBar.clear();
+    this.bossName.setVisible(!!boss);
+    if (!boss) return;
+    this.bossName.setText(boss.name);
+    const w = 80;
+    const x = GAME_WIDTH - 4 - w;
+    const y = this.bossName.y + this.bossName.height + 1;
+    g.fillStyle(0x222034).fillRect(x, y, w, 5);
+    g.fillStyle(0xd95763).fillRect(x + 1, y + 1, Math.ceil((w - 2) * (boss.hp / boss.maxHp)), 3);
+  }
+
+  /** Short centered announcement, e.g. a sword upgrade (CB-5). */
+  private showToast(message: string): void {
+    // A new message replaces the one still showing (they would overlap).
+    if (this.toastText) {
+      this.tweens.killTweensOf(this.toastText);
+      this.toastText.destroy();
+    }
+    // Below the power-up row and the boss bar.
+    const text = (this.toastText = this.add
+      .text(GAME_WIDTH / 2, 42, message, textStyle({ color: UI.ACCENT, stroke: "#000000", strokeThickness: 2, align: "center" }))
+      .setOrigin(0.5, 0)
+      .setLineSpacing(4));
+    this.tweens.add({ targets: text, alpha: 0, delay: 2200, duration: 400, onComplete: () => text.destroy() });
   }
 
   private updateHud(hud: HudState): void {

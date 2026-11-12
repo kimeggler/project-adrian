@@ -9,12 +9,14 @@ export type DamageOutcome = "hurt" | "lifeLost" | "gameOver";
  * `lives` counts the life in play too: with 1 life left, losing it is game over.
  */
 export class Health {
-  hearts: number = HEALTH.HEARTS_PER_LIFE;
+  hearts: number;
 
-  constructor(public lives: number = HEALTH.START_LIVES) {}
-
-  get maxHearts(): number {
-    return HEALTH.HEARTS_PER_LIFE;
+  constructor(
+    public lives: number = HEALTH.START_LIVES,
+    /** Differs per hero (CB-9). */
+    readonly maxHearts: number = HEALTH.HEARTS_PER_LIFE,
+  ) {
+    this.hearts = maxHearts;
   }
 
   /** Lose `amount` hearts; running out of hearts costs a life. */
@@ -30,7 +32,7 @@ export class Health {
       this.hearts = 0;
       return "gameOver";
     }
-    this.hearts = HEALTH.HEARTS_PER_LIFE;
+    this.hearts = this.maxHearts;
     return "lifeLost";
   }
 }

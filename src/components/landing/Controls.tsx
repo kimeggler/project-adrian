@@ -2,6 +2,7 @@
 const CONTROLS: { action: string; keys: string[] }[] = [
   { action: "Move", keys: ["←", "→", "A", "D"] },
   { action: "Jump", keys: ["Space", "W", "↑"] },
+  { action: "Sword", keys: ["J", "X"] },
   { action: "Pause", keys: ["Esc", "P"] },
 ];
 
@@ -26,11 +27,15 @@ export default function Controls() {
         ))}
       </dl>
       <p className="mt-4 text-center text-[8px] leading-relaxed text-[#cbdbfc]">
-        Gamepad: D-pad or stick to move, A to jump, Start to pause. On phones and tablets,
-        on-screen buttons appear.
+        Gamepad: D-pad or stick to move, A to jump, B for the sword, Start to pause. On phones
+        and tablets, on-screen buttons appear.
       </p>
       <p className="mt-3 text-center text-[8px] leading-relaxed text-[#cbdbfc]">
-        Hold jump to jump higher. Collect coins, dodge spikes, reach the flag!
+        Hold jump to jump higher. Stomp enemies or hit them with your sword, which gets stronger
+        in later levels. Knock rocks out of the air! Grab power-ups (speed boots, shield,
+        throwing axe) while they last. Smash cracked blocks, jump into thin air to find hidden
+        ones, and beat the Slime King every 5th level. Collect coins, dodge spikes, reach the
+        flag!
       </p>
     </section>
   );

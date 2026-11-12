@@ -1,7 +1,9 @@
 import * as Phaser from "phaser";
 import { START_DATA_KEY } from "../events";
 import { loadSfx } from "../systems/Audio";
+import { getSave } from "../systems/Save";
 import { createTextures } from "../textures";
+import { getWorld } from "../worlds";
 import type { LevelStartData } from "../types";
 import { SceneKey } from "./keys";
 
@@ -16,7 +18,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    createTextures(this);
+    createTextures(this, getWorld(getSave().world));
     const start = this.registry.get(START_DATA_KEY) as LevelStartData;
     this.scene.start(SceneKey.GAME, start);
   }
